@@ -91,7 +91,8 @@
           "speechRecognitionPermission": "Wholestory turns your voice stories into words on your phone, so you can read and search them."
         }
       ],
-      "@sentry/react-native/expo"
+      "@sentry/react-native/expo",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
