@@ -1,0 +1,105 @@
+{
+  "expo": {
+    "name": "Wholestory",
+    "slug": "wholestory",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "wholestory",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.wholestory.ios",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Wholestory lets you choose photos to add to your stories and event walls.",
+        "NSCameraUsageDescription": "Wholestory lets you take a photo to add to a story.",
+        "NSMicrophoneUsageDescription": "Wholestory records your voice when you tell a story.",
+        "NSFaceIDUsageDescription": "Wholestory uses Face ID to open your private albums.",
+        "NSSpeechRecognitionUsageDescription": "Wholestory turns your voice stories into words on your phone, so you can read and search them.",
+        "NSPhotoLibraryAddUsageDescription": "Wholestory can save photos from your stories to your library."
+      }
+    },
+    "android": {
+      "package": "app.wholestory.android",
+      "adaptiveIcon": {
+        "backgroundColor": "#12563E",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "resizeMode": "contain",
+          "imageWidth": 240,
+          "backgroundColor": "#F8F3E8"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Wholestory lets you choose photos to add to your stories and event walls.",
+          "cameraPermission": "Wholestory lets you take a photo to add to a story."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Wholestory records your voice when you tell a story."
+        }
+      ],
+      "expo-sharing",
+      "expo-image",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Wholestory uses Face ID to open your private albums."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Wholestory looks at your photo library on your phone to suggest stories from trips and days out. Nothing is uploaded unless you add it.",
+          "savePhotosPermission": "Wholestory can save photos from your stories to your library.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#12563E"
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Wholestory records your voice when you tell a story.",
+          "speechRecognitionPermission": "Wholestory turns your voice stories into words on your phone, so you can read and search them."
+        }
+      ],
+      "@sentry/react-native/expo"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}

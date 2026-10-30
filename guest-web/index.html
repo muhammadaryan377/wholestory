@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wholestory · Event wall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--cream:#F8F3E8;--card:#FBF8F2;--line:#ECE6DB;--green:#12563E;--navy:#0F1B33;--ink:#1D2430;--grey:#5A6066;--red:#C0392B}
+  *{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:15px/1.45 Inter,system-ui,sans-serif}
+  main{max-width:560px;margin:0 auto;padding:20px 18px 60px}
+  .brand{display:flex;align-items:center;gap:10px;font:600 22px Newsreader,Georgia,serif;color:var(--navy)}
+  h1{font:600 30px/1.1 Newsreader,Georgia,serif;color:var(--navy);margin:18px 0 4px}h2{font:600 20px Newsreader,Georgia,serif;color:var(--navy);margin:22px 0 8px}
+  .muted{color:var(--grey)}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:10px 0}
+  input,textarea{width:100%;font:15px Inter,sans-serif;padding:12px;border:1px solid #E0D9CD;border-radius:12px;background:#fff;color:var(--ink)}
+  textarea{min-height:90px;resize:vertical}label{font-weight:600;font-size:13px;display:block;margin:10px 0 6px}
+  button{font:500 16px Newsreader,Georgia,serif;border:0;border-radius:26px;padding:13px 18px;background:var(--green);color:#fff;width:100%;margin:8px 0;cursor:pointer}
+  button.ol{background:var(--card);color:var(--ink);border:1px solid #D8D2C6}button:disabled{opacity:.5}
+  .thumbs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.thumbs img{width:88px;height:88px;object-fit:cover;border-radius:10px}
+  .post img{width:100%;max-height:420px;object-fit:cover;border-radius:12px;margin-top:6px}.meta{font-size:12.5px;color:var(--grey);display:flex;justify-content:space-between}
+  .del{color:var(--red);background:none;border:0;width:auto;padding:0;margin:0;font:500 13px Inter,sans-serif;text-decoration:underline}
+  .rec{background:#C0533E}.rec.on{background:var(--red)}.notice{background:#F3D9D4;border-color:#EBC0B8}
+  .cover{width:calc(100% + 36px);margin:14px -18px 0;height:210px;object-fit:cover;display:block}
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:4px 0 8px}.chip{flex:none;border:1px solid #D8D2C6;background:var(--card);border-radius:18px;padding:7px 12px;font:13px Inter,sans-serif;cursor:pointer;color:var(--ink);width:auto;margin:0}
+  .chip.on{background:var(--green);border-color:var(--green);color:#fff}select{width:100%;font:15px Inter,sans-serif;padding:12px;border:1px solid #E0D9CD;border-radius:12px;background:#fff}
+  .cm{font-size:14px;margin:6px 0}.cm b{font-weight:600}.cmrow{display:flex;gap:8px;margin-top:8px}.cmrow input{flex:1;padding:8px 12px;border-radius:18px}.cmrow button{width:auto;margin:0;padding:8px 14px;font-size:14px}
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">Wholestory
+    <svg width="110" height="28" viewBox="0 0 160 42"><path d="M0 36 C28 32 40 10 70 12 S112 36 130 24 S150 12 160 14" fill="none" stroke="#9AA58F" stroke-width="1.3"/><circle cx="48" cy="16" r="6" fill="#F5A623"/><circle cx="80" cy="14" r="6" fill="#1D6FF2"/><circle cx="116" cy="29" r="6" fill="#2F9E6B"/><circle cx="150" cy="13" r="6" fill="#E8402B"/></svg>
+  </div>
+  <div id="app"><p class="muted">Loading the event…</p></div>
+</main>
+<script type="module">
+// ---- Fill these two in (Supabase: Project Settings -> API). The anon key is safe to publish. ----
+const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY';
+// ------------------------------------------------------------------------------------------------
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+const $ = s => document.querySelector(s), app = $('#app');
+const code = new URLSearchParams(location.search).get('e') || '';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const token = localStorage.getItem('ws_guest_token') || (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
+localStorage.setItem('ws_guest_token', token);
+let ev = null, photos = [], audio = null, audioMs = 0, rec = null, chunks = [], t0 = 0, tab = 'all', posts = [];
+const pub = p => sb.storage.from('event-media').getPublicUrl(p).data.publicUrl;
+const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+async function load() {
+  const { data, error } = await sb.rpc('guest_event', { c: code });
+  if (error || !data) { app.innerHTML = '<h1>Event not found</h1><p class="muted">Check the link or QR code you were sent.</p>'; return; }
+  ev = data; render(); listPosts();
+}
+function render() {
+  const open = ev.is_open && ev.allow_guest_uploads;
+  const name = localStorage.getItem('ws_guest_name') || '';
+  const ms = ev.moments || [];
+  app.innerHTML = `
+    ${ev.cover_path ? `<img class="cover" src="${pub(ev.cover_path)}" alt="">` : ''}
+    <h1>${esc(ev.name)}</h1>
+    <p class="muted">${[fmtDate(ev.starts_on), esc(ev.place)].filter(Boolean).join(' · ')}</p>
+    ${open ? `
+    <div class="card">
+      <label for="nm">Your name</label><input id="nm" value="${esc(name)}" placeholder="So the hosts know who added it" autocomplete="name">
+      ${ms.length ? `<label for="mom">Which moment?</label><select id="mom"><option value="">Choose a moment (optional)</option>${ms.map(m => `<option value="${m.id}">${esc((m.time_label ? m.time_label + ' · ' : '') + m.name)}</option>`).join('')}</select>` : ''}
+      <label>Photos</label><input id="files" type="file" accept="image/*" multiple>
+      <div class="thumbs" id="thumbs"></div>
+      <label for="tx">Your story (optional)</label><textarea id="tx" placeholder="Share a memory, a message or a special moment…"></textarea>
+      <button class="rec" id="recbtn">🎙 Record a voice story</button><div id="recinfo" class="muted" style="font-size:13px"></div>
+      <button id="send">Add to the wall</button>
+      <p class="muted" style="font-size:12px">${ev.require_approval ? 'The hosts will check what you add before it appears. ' : ''}${ev.guests_see === 'own' ? 'Only you and the hosts can see what you add.' : 'Everyone at the event can see what you add.'}</p>
+    </div>` : `<div class="card notice">This wall is closed to new photos and stories.</div>`}
+    <h2>${ev.guests_see === 'own' ? 'What you added' : 'On the wall'}</h2>
+    ${ms.length ? `<div class="chips" id="tabs"><button class="chip ${tab === 'all' ? 'on' : ''}" data-t="all">All</button>${ms.map(m => `<button class="chip ${tab === m.id ? 'on' : ''}" data-t="${m.id}">${esc(m.name)}</button>`).join('')}</div>` : ''}
+    <div id="posts"><p class="muted">Loading…</p></div>`;
+  document.querySelectorAll('#tabs .chip').forEach(b => b.onclick = () => { tab = b.dataset.t; document.querySelectorAll('#tabs .chip').forEach(x => x.classList.toggle('on', x === b)); drawPosts(); });
+  if (!open) return;
+  $('#files').onchange = e => { photos = [...photos, ...e.target.files]; drawThumbs(); };
+  $('#recbtn').onclick = toggleRec; $('#send').onclick = send;
+}
+function drawThumbs() {
+  $('#thumbs').querySelectorAll('img').forEach(im => URL.revokeObjectURL(im.src));
+  $('#thumbs').innerHTML = photos.map((f, i) => `<img src="${URL.createObjectURL(f)}" alt="" data-i="${i}" title="Tap to remove">`).join('');
+  $('#thumbs').querySelectorAll('img').forEach(im => im.onclick = () => { photos.splice(+im.dataset.i, 1); drawThumbs(); });
+}
+async function shrinkPhoto(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image(); image.src = url;
+    await image.decode();
+    const scale = Math.min(1, 2048 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+    return await new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not prepare photo.')), 'image/jpeg', 0.8));
+  } finally { URL.revokeObjectURL(url); }
+}
+async function toggleRec() {
+  const b = $('#recbtn');
+  if (rec && rec.state === 'recording') { rec.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    rec = new MediaRecorder(stream); chunks = []; t0 = Date.now();
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); audio = new Blob(chunks, { type: rec.mimeType || 'audio/webm' }); audioMs = Date.now() - t0; b.classList.remove('on'); b.textContent = '🎙 Record again';
+      $('#recinfo').innerHTML = `Recorded ${Math.round(audioMs / 1000)}s · <button class="del" id="delrec">Delete recording</button>`; $('#delrec').onclick = () => { audio = null; audioMs = 0; $('#recinfo').textContent = ''; b.textContent = '🎙 Record a voice story'; }; };
+    rec.start(); b.classList.add('on'); b.textContent = '■ Stop recording'; $('#recinfo').textContent = 'Recording…';
+  } catch { alert('Your browser did not allow the microphone.'); }
+}
+async function upload(fileOrBlob, ext) {
+  const path = `${ev.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await sb.storage.from('event-media').upload(path, fileOrBlob, { contentType: fileOrBlob.type || undefined });
+  if (error) throw error; return path;
+}
+async function send() {
+  if (rec && rec.state === 'recording') return alert('Stop the recording before adding it to the wall.');
+  const name = $('#nm').value.trim(), text = $('#tx').value.trim();
+  if (!name) return alert('Please add your name first.');
+  if (!photos.length && !text && !audio) return alert('Add a photo, a story or a voice recording.');
+  localStorage.setItem('ws_guest_name', name);
+  const btn = $('#send'); btn.disabled = true; btn.textContent = 'Adding…';
+  try {
+    const paths = [];
+    for (const f of photos) paths.push(await upload(await shrinkPhoto(f), 'jpg'));
+    const ap = audio ? await upload(audio, audio.type.includes('mp4') ? 'm4a' : 'webm') : null;
+    const mom = $('#mom') ? ($('#mom').value || null) : null;
+    const { error } = await sb.rpc('guest_add_post', { c: code, gname: name, gtoken: token, body: text, photo_paths: paths, audio: ap, dur: audio ? audioMs : null, moment: mom });
+    if (error) throw error;
+    photos = []; audio = null; render(); listPosts();
+    alert(ev.require_approval ? 'Sent to the hosts for approval. Thank you!' : 'Added to the wall. Thank you!');
+  } catch (e) { alert('Could not add: ' + (e.message || e)); btn.disabled = false; btn.textContent = 'Add to the wall'; }
+}
+async function listPosts() {
+  const { data, error } = await sb.rpc('guest_posts', { c: code, gtoken: token });
+  const box = $('#posts'); if (!box) return;
+  if (error) { box.innerHTML = '<p class="muted">Could not load the wall.</p>'; return; }
+  posts = data || []; drawPosts();
+}
+function drawPosts() {
+  const box = $('#posts'); if (!box) return;
+  const shown = tab === 'all' ? posts : posts.filter(p => p.moment_id === tab);
+  const mName = id => ((ev.moments || []).find(m => m.id === id) || {}).name;
+  const canComment = ev.is_open;
+  if (!shown.length) { box.innerHTML = `<p class="muted">${posts.length ? 'Nothing in this moment yet.' : 'Nothing here yet. Be the first to add a photo or story.'}</p>`; return; }
+  box.innerHTML = shown.map(p => `<div class="card post"><div class="meta"><span>${esc(p.guest_name || 'Host')}${p.mine ? ' (you)' : ''}${mName(p.moment_id) ? ' · ' + esc(mName(p.moment_id)) : ''}</span>${p.mine ? `<button class="del" data-del="${p.id}">Delete</button>` : ''}</div>
+    ${(p.photos || []).map(x => `<img src="${pub(x)}" alt="" loading="lazy">`).join('')}
+    ${p.text ? `<p style="font:17px/1.4 Newsreader,Georgia,serif">${esc(p.text)}</p>` : ''}
+    ${p.audio_path ? `<audio controls src="${pub(p.audio_path)}" style="width:100%;margin-top:6px"></audio>` : ''}
+    ${(p.comments || []).map(c => `<div class="cm"><b>${esc(c.name)}${c.mine ? ' (you)' : ''}</b> ${esc(c.text)} ${c.mine ? `<button class="del" data-delc="${c.id}">Delete</button>` : ''}</div>`).join('')}
+    ${canComment ? `<div class="cmrow"><input placeholder="Add a comment…" data-cin="${p.id}"><button data-cpost="${p.id}">Post</button></div>` : ''}</div>`).join('');
+  box.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { if (!confirm('Delete what you added?')) return; await sb.rpc('guest_delete_post', { pid: b.dataset.del, gtoken: token }); listPosts(); });
+  box.querySelectorAll('[data-delc]').forEach(b => b.onclick = async () => { await sb.rpc('guest_delete_comment', { cid: b.dataset.delc, gtoken: token }); listPosts(); });
+  box.querySelectorAll('[data-cpost]').forEach(b => b.onclick = async () => {
+    const input = box.querySelector(`[data-cin="${b.dataset.cpost}"]`), body = input.value.trim();
+    const name = ($('#nm') && $('#nm').value.trim()) || localStorage.getItem('ws_guest_name') || prompt('Your name, so the hosts know who commented') || '';
+    if (!body || !name.trim()) return;
+    localStorage.setItem('ws_guest_name', name.trim());
+    const { error } = await sb.rpc('guest_add_comment', { c: code, gname: name.trim(), gtoken: token, pid: b.dataset.cpost, body });
+    if (error) return alert('Could not post: ' + error.message);
+    listPosts();
+  });
+}
+load();
+</script>
+</body>
+</html>
