@@ -1,5 +1,7 @@
 # Wholestory: handover readiness
 
+Updated repair details and deployment requirements: [REPAIR-NOTES.md](REPAIR-NOTES.md).
+
 Status is based on source review and local checks, not on real iPhone testing.
 Payments remain off. Brand, pricing, on-device transcription and public-by-link
 event media remain as specified in the brief.
@@ -48,12 +50,12 @@ by this coding session. Verify with two independent user accounts.
 | Backend | App opens; signup, photo/audio story and event saves need live verification |
 | Guest page | Source ready; real Supabase public credentials, hosting URL and deployment needed |
 | Two real iPhones, one older | Not tested; development build and client devices needed |
-| EAS / Apple configuration | Project ID and App Store Connect values remain placeholders |
+| EAS / Apple configuration | Project is linked locally; remote environment values and Apple build/install still need verification |
 | Crash reporting | Code prepared; client Sentry DSN, organization, project and EAS secret auth token needed; verify a test crash in release build |
 | Photo resize | Implemented in app and guest page; inspect dimensions of a real upload |
 | TestFlight | No build submitted or installed by internal testers |
 | Privacy Policy / Terms | Client-approved live URLs and link verification needed |
-| Client GitHub | No remote push performed |
+| Client GitHub | Initial code was pushed; this repair pass is local until separately pushed |
 | Two-week support | Needs 10–20 testers, real event, shared issue list and scheduled updates |
 
 Sentry variables: `EXPO_PUBLIC_SENTRY_DSN` in local/build environments;
@@ -63,10 +65,9 @@ and source-map uploads before inviting testers.
 
 ## Known issues / release blockers
 
-- Full password-recovery link handling and new-password UI are still missing.
+- Password recovery is implemented; configure the redirect allowlist and verify live email delivery (REPAIR-NOTES.md).
 - Event/account deletion and guest deletion do not reliably remove all storage
-  objects. Database cascades do not delete stored files; a backend cleanup job is
-  needed before promising “delete everywhere”.
+  objects. Database cascades do not delete stored files; the prepared cleanup worker must be deployed/scheduled before promising “delete everywhere”.
 - Storage authorization, guest RPC inputs, upload limits/rate limiting and public
   function grants need a complete second-user/anonymous security test.
 - Exports still assemble the ZIP in memory; test large libraries on the older phone.

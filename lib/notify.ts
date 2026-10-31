@@ -1,3 +1,4 @@
+import { parseDate } from '@/lib/dates';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
@@ -5,21 +6,30 @@ import { AndroidImportance } from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { savePushToken, type Story } from './api';
+import { supabase } from './supabase';
 
 export type NotifyPrefs = { memories: boolean; dailyPrompt: boolean; fromOthers: boolean };
 const KEY = 'ws_notify_prefs';
 export const defaultPrefs: NotifyPrefs = { memories: true, dailyPrompt: false, fromOthers: true };
 
-Notifications.setNotificationHandler({
+if (Platform.OS !== 'web') Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
 });
 
 export async function getPrefs(): Promise<NotifyPrefs> {
-  try { return { ...defaultPrefs, ...JSON.parse((await AsyncStorage.getItem(KEY)) ?? '{}') }; } catch { return defaultPrefs; }
+  try {
+    const { data } = await supabase.auth.getSession();
+    return { ...defaultPrefs, ...JSON.parse((await AsyncStorage.getItem(`${KEY}_${data.session?.user.id ?? 'signed_out'}`)) ?? '{}') };
+  } catch { return { ...defaultPrefs }; }
 }
-export async function setPrefs(p: NotifyPrefs) { await AsyncStorage.setItem(KEY, JSON.stringify(p)); }
+export async function setPrefs(p: NotifyPrefs) {
+  const { data } = await supabase.auth.getSession();
+  await AsyncStorage.setItem(`${KEY}_${data.session?.user.id ?? 'signed_out'}`, JSON.stringify(p));
+}
 
 export async function askPermission() {
+  if (Platform.OS === 'web') return false;
+  if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync('default', { name: 'Wholestory', importance: AndroidImportance.DEFAULT });
   const cur = await Notifications.getPermissionsAsync();
   if (cur.granted) return true;
   const r = await Notifications.requestPermissionsAsync();
@@ -28,6 +38,7 @@ export async function askPermission() {
 
 /** Registers this phone for notifications from other people (story additions, guest uploads). */
 export async function registerPush(enabled: boolean) {
+  if (Platform.OS === 'web') return;
   try {
     if (!enabled) return savePushToken(null);
     if (!Device.isDevice || !(await askPermission())) return;
@@ -39,8 +50,17 @@ export async function registerPush(enabled: boolean) {
 }
 
 /** Schedules gentle local reminders: story anniversaries and an evening prompt. */
-export async function scheduleLocal(stories: Story[], prefs: NotifyPrefs) {
+let scheduleQueue: Promise<void> = Promise.resolve();
+export function scheduleLocal(stories: Story[], prefs: NotifyPrefs) {
+  if (Platform.OS === 'web') return Promise.resolve();
+  const next = scheduleQueue.catch(() => {}).then(() => scheduleReminders(stories, prefs));
+  scheduleQueue = next;
+  return next;
+}
+async function scheduleReminders(stories: Story[], prefs: NotifyPrefs) {
   await Notifications.cancelAllScheduledNotificationsAsync();
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) return;
   if (!(prefs.memories || prefs.dailyPrompt)) return;
   if (!(await askPermission())) return;
   if (prefs.memories) {
@@ -48,9 +68,12 @@ export async function scheduleLocal(stories: Story[], prefs: NotifyPrefs) {
     const upcoming = stories
       .filter(s => !s.hidden_from_memories && !s.private)
       .map(s => {
-        const d = new Date(s.story_date);
-        const next = new Date(now.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0);
-        if (next <= now) next.setFullYear(now.getFullYear() + 1);
+        const d = parseDate(s.story_date);
+        let year = now.getFullYear();
+        let next = new Date(year, d.getMonth(), d.getDate(), 9, 0, 0);
+        while (next <= now || next.getMonth() !== d.getMonth() || next.getDate() !== d.getDate()) {
+          next = new Date(++year, d.getMonth(), d.getDate(), 9, 0, 0);
+        }
         return { s, next, years: next.getFullYear() - d.getFullYear() };
       })
       .filter(x => x.years >= 1)

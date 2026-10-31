@@ -1,15 +1,16 @@
-import { useCallback, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
-import { Screen, H1, P, Card, Small, Empty, Field, Btn, Loading } from '@/components/ui';
-import { addPerson, listPeople, type Person } from '@/lib/api';
+import { useFocusResource } from '@/lib/use-focus-resource';
+import { useState } from 'react';
+import { Text, View } from 'react-native';
+import { Alert } from '@/lib/alert';
+import { router } from 'expo-router';
+import { LoadError, Screen, H1, P, Card, Small, Empty, Field, Btn, Loading } from '@/components/ui';
+import { addPerson, listPeople } from '@/lib/api';
 import { C, F } from '@/lib/theme';
 
 export default function People() {
-  const [people, setPeople] = useState<Person[] | null>(null); const [name, setName] = useState(''); const [rel, setRel] = useState(''); const [adding, setAdding] = useState(false);
-  const load = useCallback(() => { listPeople().then(setPeople).catch(() => setPeople([])); }, []);
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const { data: people, error, reload: load } = useFocusResource(listPeople); const [name, setName] = useState(''); const [rel, setRel] = useState(''); const [adding, setAdding] = useState(false);
   const add = async () => { if (!name.trim()) return Alert.alert('Add a name first'); await addPerson(name, rel); setName(''); setRel(''); setAdding(false); load(); };
+  if (error) return <LoadError error={error} onRetry={load} />;
   if (!people) return <Loading />;
   return (
     <Screen>

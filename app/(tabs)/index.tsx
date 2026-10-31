@@ -1,3 +1,4 @@
+import { parseDate } from '@/lib/dates';
 import { useCallback, useState } from 'react';
 import { View, Text, Pressable, RefreshControl, ScrollView } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -12,18 +13,21 @@ import { Image } from 'expo-image';
 import { C, F, S } from '@/lib/theme';
 
 const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
-const sameDayLastYears = (d: string) => { const t = new Date(); const x = new Date(d); return x.getDate() === t.getDate() && x.getMonth() === t.getMonth() && x.getFullYear() < t.getFullYear(); };
+const sameDayLastYears = (d: string) => { const t = new Date(); const x = parseDate(d); return x.getDate() === t.getDate() && x.getMonth() === t.getMonth() && x.getFullYear() < t.getFullYear(); };
 
 export default function Today() {
   const [name, setName] = useState(''); const [stories, setStories] = useState<Story[] | null>(null); const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const [allowed, setAllowed] = useState<boolean | null>(null); const [sugs, setSugs] = useState<Suggestion[]>([]); const [keep, setKeep] = useState<((s: Story) => boolean) | null>(null);
   const load = useCallback(async () => {
     setBusy(true);
+    setError('');
     try {
       setName(await myName()); const st = await listStories(); const f = await memoryFilter(); setKeep(() => f); setStories(st);
       const ok = await libraryAllowed(); setAllowed(ok); if (ok) setSugs(await findSuggestions(6));
       scheduleLocal(st.filter(f), await getPrefs()).catch(() => {});
-    } finally { setBusy(false); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not load your stories.'); }
+    finally { setBusy(false); }
   }, []);
   const tell = async (s: Suggestion) => { handOff({ photos: await toPicked(s.assets), title: s.title, prompt: 'What do you remember most about this?' }); router.push('/story/new'); };
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -37,6 +41,7 @@ export default function Today() {
         </View>
         <H1 style={{ marginTop: 6 }}>{greet()}{name ? `, ${name}` : ''}</H1>
         <P muted style={{ marginBottom: 16 }}>A new day. More memories to discover.</P>
+        {error ? <Card><P accessibilityRole="alert">{error}</P><Btn title="Try again" onPress={load} /></Card> : null}
 
         <Card onPress={() => router.push({ pathname: '/story/new', params: { quick: '1' } })} style={{ backgroundColor: '#F6E4DE', borderColor: '#EBCFC6' }}>
           <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.navy }}>What made today special?</Text>
@@ -68,7 +73,7 @@ export default function Today() {
           {memories.length ? memories.map(s => (
             <Card key={s.id} onPress={() => router.push(`/story/${s.id}`)} style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
               {s.cover ? <Photo path={s.cover} size={64} /> : null}
-              <View style={{ flex: 1 }}><Text style={{ fontFamily: F.serif, fontSize: 17, color: C.navy }}>{s.title}</Text><Small>{new Date(s.story_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</Small></View>
+              <View style={{ flex: 1 }}><Text style={{ fontFamily: F.serif, fontSize: 17, color: C.navy }}>{s.title}</Text><Small>{parseDate(s.story_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</Small></View>
             </Card>
           )) : <Card><Small>Nothing from this day in past years yet. Memories you add will come back here on their anniversary.</Small></Card>}
 

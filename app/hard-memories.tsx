@@ -1,23 +1,27 @@
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { useFocusEffect } from 'expo-router';
-import { Screen, H1, H2, P, ToggleRow, Loading, Small, Field, Btn } from '@/components/ui';
+import { LoadError, Screen, H1, H2, P, ToggleRow, Loading, Small, Field, Btn } from '@/components/ui';
 import { addSkipDate, deleteSkipDate, listPeople, listSkipDates, listStories, me, setPersonHidden, updateStory, type Person, type SkipDate, type Story } from '@/lib/api';
 import { C, F } from '@/lib/theme';
+import { validMonthDay } from '@/lib/dates';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 export default function HardMemories() {
   const [stories, setStories] = useState<Story[] | null>(null); const [people, setPeople] = useState<(Person & { hidden_from_memories?: boolean })[]>([]); const [dates, setDates] = useState<SkipDate[]>([]);
   const [d, setD] = useState(''); const [label, setLabel] = useState('');
+  const [loadError, setLoadError] = useState('');
   const load = useCallback(async () => {
-    const u = await me(); setStories((await listStories()).filter(s => s.owner === u?.id)); setPeople(await listPeople()); setDates(await listSkipDates());
+    try { setLoadError(''); const u = await me(); setStories((await listStories()).filter(s => s.owner === u?.id)); setPeople(await listPeople()); setDates(await listSkipDates()); } catch (e) { setLoadError(e instanceof Error ? e.message : 'Could not load.'); }
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
   const addDate = async () => {
     const m = d.trim().match(/^(\d{1,2})\/(\d{1,2})$/);
-    if (!m || +m[2] < 1 || +m[2] > 12 || +m[1] < 1 || +m[1] > 31) return Alert.alert('Check the date', 'Use day/month, for example 14/02.');
+    if (!m || !validMonthDay(+m[2], +m[1])) return Alert.alert('Check the date', 'Use a valid day/month, for example 14/02.');
     await addSkipDate(+m[2], +m[1], label); setD(''); setLabel(''); load();
   };
+  if (loadError) return <LoadError error={loadError} onRetry={load} />;
   if (!stories) return <Loading />;
   return (
     <Screen>

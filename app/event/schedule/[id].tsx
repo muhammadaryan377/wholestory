@@ -1,7 +1,9 @@
+import { parseDate } from '@/lib/dates';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Screen, H1, H2, P, Field, Btn, Small, Chip, Loading } from '@/components/ui';
+import { LoadError, Screen, H1, H2, P, Field, Btn, Small, Chip, Loading } from '@/components/ui';
 import { addMoment, deleteMoment, getEvent, updateMoment, type EventRow, type Moment } from '@/lib/api';
 import { C, F } from '@/lib/theme';
 
@@ -11,11 +13,15 @@ export default function Schedule() {
   const [ev, setEv] = useState<EventRow | null>(null); const [moments, setMoments] = useState<Moment[]>([]);
   const [name, setName] = useState(''); const [time, setTime] = useState(''); const [day, setDay] = useState(1);
   const [editing, setEditing] = useState<string | null>(null); const [eName, setEName] = useState(''); const [eTime, setETime] = useState('');
-  const load = useCallback(async () => { const r = await getEvent(id); setEv(r.ev); setMoments(r.moments); }, [id]);
+  const [loadError, setLoadError] = useState('');
+  const load = useCallback(async () => {
+    try { setLoadError(''); const r = await getEvent(id); setEv(r.ev); setMoments(r.moments); } catch (e) { setLoadError(e instanceof Error ? e.message : 'Could not load.'); }
+  }, [id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
+  if (loadError) return <LoadError error={loadError} onRetry={load} />;
   if (!ev) return <Loading />;
-  const days = ev.starts_on && ev.ends_on ? Math.max(1, Math.round((new Date(ev.ends_on).getTime() - new Date(ev.starts_on).getTime()) / 864e5) + 1) : 1;
-  const dayLabel = (d: number) => { if (!ev.starts_on) return `Day ${d}`; const x = new Date(ev.starts_on); x.setDate(x.getDate() + d - 1); return x.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); };
+  const days = ev.starts_on && ev.ends_on ? Math.max(1, Math.round((parseDate(ev.ends_on).getTime() - parseDate(ev.starts_on).getTime()) / 864e5) + 1) : 1;
+  const dayLabel = (d: number) => { if (!ev.starts_on) return `Day ${d}`; const x = parseDate(ev.starts_on); x.setDate(x.getDate() + d - 1); return x.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); };
   const add = async () => { if (!name.trim()) return Alert.alert('Name the moment', 'For example “First dance”.'); await addMoment(ev.id, { day, time_label: time.trim(), name: name.trim() }); setName(''); setTime(''); load(); };
   return (
     <Screen>

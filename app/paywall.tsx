@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { Pressable, Text, View } from 'react-native';
+import { Alert } from '@/lib/alert';
+import { Redirect, router } from 'expo-router';
 import type { PurchasesPackage } from 'react-native-purchases';
 import { Screen, H1, P, Btn, Small, Thread } from '@/components/ui';
-import { buy, getPackages, restore } from '@/lib/payments';
+import { buy, getPackages, restore, PAYMENTS_ENABLED } from '@/lib/payments';
 import { C, F } from '@/lib/theme';
 
 export default function Paywall() {
@@ -13,6 +14,7 @@ export default function Paywall() {
     if (!pkgs[sel]) return Alert.alert('Not available yet', 'Subscriptions are not set up in this build.');
     setBusy(true); try { if (await buy(pkgs[sel])) router.replace('/(tabs)'); } catch (e: any) { if (!e?.userCancelled) Alert.alert('Purchase didn’t go through', e?.message ?? ''); } finally { setBusy(false); }
   };
+  if (!PAYMENTS_ENABLED) return <Redirect href="/(tabs)" />;
   return (
     <Screen>
       <View style={{ alignItems: 'center' }}><Thread width={160} /></View>

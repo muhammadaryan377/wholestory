@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react';
-import { Alert, Share, View, Text, Pressable, Modal, ScrollView } from 'react-native';
+import { Share, View, Text, Pressable, Modal, ScrollView } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { router, useFocusEffect, useLocalSearchParams, Stack } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import QRCode from 'react-native-qrcode-svg';
-import { Screen, H1, H2, Small, Card, Btn, Loading, Empty, ToggleRow, Chip, P } from '@/components/ui';
+import { LoadError, Screen, H1, H2, Small, Card, Btn, Loading, Empty, ToggleRow, Chip, P, runAction } from '@/components/ui';
 import { Photo, VoicePlayer, Composer } from '@/components/media';
 import { Comments } from '@/components/comments';
 import { approvePost, deleteEvent, deletePost, emptyDraft, getEvent, hostPost, me, newEventLink, setCover, updateEvent, type Draft, type EventRow, type Moment, type Post } from '@/lib/api';
@@ -13,7 +14,7 @@ import { GUEST_PAGE_URL } from '@/lib/supabase';
 import { eventUrl } from '@/lib/media';
 import { exportEvent } from '@/lib/exporter';
 import { C, F, S } from '@/lib/theme';
-import { dateRange } from '../(tabs)/events';
+import { dateRange } from '@/lib/dates';
 
 const EXPIRY: { key: string; label: string; at: (ev: EventRow) => string | null }[] = [
   { key: 'never', label: 'Never', at: () => null },
@@ -22,6 +23,7 @@ const EXPIRY: { key: string; label: string; at: (ev: EventRow) => string | null 
 ];
 
 export default function EventScreen() {
+  const [loadError, setLoadError] = useState('');
   const { id } = useLocalSearchParams<{ id: string }>();
   const [data, setData] = useState<{ ev: EventRow; moments: Moment[]; posts: Post[] } | null>(null);
   const [uid, setUid] = useState<string | null>(null);
@@ -30,8 +32,16 @@ export default function EventScreen() {
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [postMoment, setPostMoment] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const load = useCallback(async () => { try { setData(await getEvent(id)); setUid((await me())?.id ?? null); } catch { router.back(); } }, [id]);
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const load = useCallback(async () => { try { setLoadError(''); setData(await getEvent(id)); setUid((await me())?.id ?? null); } catch (e) { setLoadError(e instanceof Error ? e.message : 'Could not load. Please try again.'); } }, [id]);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    void load();
+    const timer = setInterval(() => {
+      getEvent(id).then(result => { if (active) setData(result); }).catch(() => {});
+    }, 15000);
+    return () => { active = false; clearInterval(timer); };
+  }, [load, id]));
+  if (loadError) return <LoadError error={loadError} onRetry={load} />;
   if (!data) return <Loading />;
   const { ev, posts, moments } = data;
   const link = `${GUEST_PAGE_URL}?e=${ev.code}`;
@@ -49,6 +59,8 @@ export default function EventScreen() {
   };
   const remove = (p: Post) => Alert.alert('Remove this from the wall?', '', [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: async () => { await deletePost(p); load(); } }]);
   const addPost = async () => {
+    if (busy) return;
+    if (draft.recording || draft.processingAudio) return Alert.alert('Finish your recording first', 'Stop recording and wait for the words before saving.');
     if (!draft.photos.length && !draft.text.trim() && !draft.audioUri) return Alert.alert('Add something first');
     setBusy(true);
     try { await hostPost(ev.id, draft, postMoment); setDraft(emptyDraft()); setSheet('none'); load(); }
@@ -56,8 +68,8 @@ export default function EventScreen() {
   };
   const expiryKey = !ev.link_expires_at ? 'never' : 'set';
 
-  const PostCard = ({ p }: { p: Post }) => (
-    <Card>
+  const renderPost = (p: Post) => (
+    <Card key={p.id}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <Small>{p.author_user ? 'You (host)' : p.guest_name || 'Guest'}{momentName(p.moment_id) ? ` · ${momentName(p.moment_id)}` : ''} · {new Date(p.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</Small>
         <Pressable onPress={() => remove(p)} hitSlop={10} accessibilityLabel="Remove"><Text style={{ color: C.faint }}>🗑</Text></Pressable>
@@ -74,7 +86,7 @@ export default function EventScreen() {
     <>
       <Stack.Screen options={{ title: '', headerRight: () => <Pressable onPress={() => setSheet('settings')} hitSlop={12}><Text style={{ fontSize: 22, color: C.ink }}>⋯</Text></Pressable> }} />
       <Screen>
-        <Pressable onPress={changeCover} accessibilityLabel="Change cover photo" style={{ marginHorizontal: -S.pad, marginTop: -S.pad, marginBottom: 12 }}>
+        <Pressable onPress={() => runAction(changeCover)} accessibilityLabel="Change cover photo" style={{ marginHorizontal: -S.pad, marginTop: -S.pad, marginBottom: 12 }}>
           {ev.cover_path ? <Image source={{ uri: eventUrl(ev.cover_path) }} style={{ width: '100%', height: 210 }} contentFit="cover" />
             : <View style={{ height: 120, backgroundColor: C.greenSoft, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: F.sansMedium, color: C.green }}>＋ Add a cover photo</Text></View>}
           {ev.cover_path ? <View style={{ position: 'absolute', right: 12, bottom: 10, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 }}><Text style={{ color: '#fff', fontSize: 12 }}>Edit cover</Text></View> : null}
@@ -96,7 +108,7 @@ export default function EventScreen() {
           <Btn title="Add photos or a story" onPress={() => { setPostMoment(tab !== 'all' && tab !== 'none' ? tab : null); setSheet('add'); }} style={{ flex: 1 }} disabled={!ev.is_open} />
           <Btn title="Schedule" kind="outline" onPress={() => router.push(`/event/schedule/${ev.id}`)} style={{ flex: 0.6 }} />
         </View>
-        {pending.length ? <><H2 style={{ marginTop: 8 }}>Waiting for approval ({pending.length})</H2>{pending.map(p => <PostCard key={p.id} p={p} />)}</> : null}
+        {pending.length ? <><H2 style={{ marginTop: 8 }}>Waiting for approval ({pending.length})</H2>{pending.map(renderPost)}</> : null}
         <H2 style={{ marginTop: 8 }}>On the wall · {photoCount} {photoCount === 1 ? 'photo' : 'photos'}</H2>
         {moments.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }}>
@@ -106,7 +118,7 @@ export default function EventScreen() {
           </ScrollView>
         ) : null}
         {!shown.length ? <Empty title={live.length ? 'Nothing in this moment yet' : 'Nothing added yet'} body="Share the QR code or link so guests can add theirs. Their photos and stories appear here as they’re added." /> : null}
-        {shown.map(p => <PostCard key={p.id} p={p} />)}
+        {shown.map(renderPost)}
       </Screen>
 
       <Modal visible={sheet === 'settings'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet('none')}>
@@ -144,7 +156,7 @@ export default function EventScreen() {
           {moments.length ? (<><Small style={{ marginBottom: 6 }}>Which moment?</Small>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{moments.map(m => <Chip key={m.id} label={m.name} on={postMoment === m.id} onPress={() => setPostMoment(postMoment === m.id ? null : m.id)} />)}</View></>) : null}
           <Composer draft={draft} setDraft={setDraft} prompt="What do you want everyone to remember?" />
-          <Btn title="Add to the wall" onPress={addPost} busy={busy} />
+          <Btn title="Add to the wall" onPress={addPost} busy={busy} disabled={!!(draft.recording || draft.processingAudio)} />
           <Btn kind="link" title="Cancel" onPress={() => setSheet('none')} />
         </ScrollView>
       </Modal>

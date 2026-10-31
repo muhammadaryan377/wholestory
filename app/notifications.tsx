@@ -2,14 +2,18 @@ import { useEffect, useState } from 'react';
 import { Screen, H1, P, ToggleRow, Small } from '@/components/ui';
 import { defaultPrefs, getPrefs, registerPush, scheduleLocal, setPrefs, type NotifyPrefs } from '@/lib/notify';
 import { listStories, memoryFilter } from '@/lib/api';
+import { Alert } from '@/lib/alert';
 
 export default function NotificationSettings() {
   const [p, setP] = useState<NotifyPrefs>(defaultPrefs);
   useEffect(() => { getPrefs().then(setP); }, []);
   const change = async (next: NotifyPrefs) => {
-    setP(next); await setPrefs(next);
-    await scheduleLocal((await listStories()).filter(await memoryFilter()), next);
-    if (next.fromOthers !== p.fromOthers) await registerPush(next.fromOthers);
+    try {
+      await setPrefs(next);
+      await scheduleLocal((await listStories()).filter(await memoryFilter()), next);
+      if (next.fromOthers !== p.fromOthers) await registerPush(next.fromOthers);
+      setP(next);
+    } catch (error) { Alert.alert('Could not update reminders', error instanceof Error ? error.message : 'Please try again.'); }
   };
   return (
     <Screen>

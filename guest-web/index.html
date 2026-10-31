@@ -34,13 +34,14 @@
   </div>
   <div id="app"><p class="muted">Loading the event…</p></div>
 </main>
+<script src="./config.js"></script>
 <script type="module">
 // ---- Fill these two in (Supabase: Project Settings -> API). The anon key is safe to publish. ----
-const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY';
+const SUPABASE_URL = window.WHOLESTORY_CONFIG?.url || '';
+const SUPABASE_ANON_KEY = window.WHOLESTORY_CONFIG?.key || '';
 // ------------------------------------------------------------------------------------------------
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+const sb = SUPABASE_URL && SUPABASE_ANON_KEY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } }) : null;
 const $ = s => document.querySelector(s), app = $('#app');
 const code = new URLSearchParams(location.search).get('e') || '';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -51,6 +52,7 @@ const pub = p => sb.storage.from('event-media').getPublicUrl(p).data.publicUrl;
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
 async function load() {
+  if (!sb) { app.innerHTML = '<h1>Event page unavailable</h1><p class="muted">Please contact the host for a working event link.</p>'; return; }
   const { data, error } = await sb.rpc('guest_event', { c: code });
   if (error || !data) { app.innerHTML = '<h1>Event not found</h1><p class="muted">Check the link or QR code you were sent.</p>'; return; }
   ev = data; render(); listPosts();
@@ -60,7 +62,7 @@ function render() {
   const name = localStorage.getItem('ws_guest_name') || '';
   const ms = ev.moments || [];
   app.innerHTML = `
-    ${ev.cover_path ? `<img class="cover" src="${pub(ev.cover_path)}" alt="">` : ''}
+    ${ev.cover_path ? `<img class="cover" src="${esc(pub(ev.cover_path))}" alt="">` : ''}
     <h1>${esc(ev.name)}</h1>
     <p class="muted">${[fmtDate(ev.starts_on), esc(ev.place)].filter(Boolean).join(' · ')}</p>
     ${open ? `
@@ -102,15 +104,16 @@ async function shrinkPhoto(file) {
 }
 async function toggleRec() {
   const b = $('#recbtn');
-  if (rec && rec.state === 'recording') { rec.stop(); return; }
+  let stream;
+  if (rec && rec.state === 'recording') { b.disabled = true; $('#send').disabled = true; rec.stop(); return; }
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    b.disabled = true; stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     rec = new MediaRecorder(stream); chunks = []; t0 = Date.now();
     rec.ondataavailable = e => chunks.push(e.data);
-    rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); audio = new Blob(chunks, { type: rec.mimeType || 'audio/webm' }); audioMs = Date.now() - t0; b.classList.remove('on'); b.textContent = '🎙 Record again';
+    rec.onstop = () => { b.disabled = false; $('#send').disabled = false; stream.getTracks().forEach(t => t.stop()); audio = new Blob(chunks, { type: rec.mimeType || 'audio/webm' }); audioMs = Date.now() - t0; b.classList.remove('on'); b.textContent = '🎙 Record again';
       $('#recinfo').innerHTML = `Recorded ${Math.round(audioMs / 1000)}s · <button class="del" id="delrec">Delete recording</button>`; $('#delrec').onclick = () => { audio = null; audioMs = 0; $('#recinfo').textContent = ''; b.textContent = '🎙 Record a voice story'; }; };
-    rec.start(); b.classList.add('on'); b.textContent = '■ Stop recording'; $('#recinfo').textContent = 'Recording…';
-  } catch { alert('Your browser did not allow the microphone.'); }
+    rec.start(); b.disabled = false; b.classList.add('on'); b.textContent = '■ Stop recording'; $('#recinfo').textContent = 'Recording…';
+  } catch { stream?.getTracks().forEach(track => track.stop()); b.disabled = false; alert('Your browser did not allow the microphone.'); }
 }
 async function upload(fileOrBlob, ext) {
   const path = `${ev.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
@@ -148,13 +151,13 @@ function drawPosts() {
   const canComment = ev.is_open;
   if (!shown.length) { box.innerHTML = `<p class="muted">${posts.length ? 'Nothing in this moment yet.' : 'Nothing here yet. Be the first to add a photo or story.'}</p>`; return; }
   box.innerHTML = shown.map(p => `<div class="card post"><div class="meta"><span>${esc(p.guest_name || 'Host')}${p.mine ? ' (you)' : ''}${mName(p.moment_id) ? ' · ' + esc(mName(p.moment_id)) : ''}</span>${p.mine ? `<button class="del" data-del="${p.id}">Delete</button>` : ''}</div>
-    ${(p.photos || []).map(x => `<img src="${pub(x)}" alt="" loading="lazy">`).join('')}
+    ${(p.photos || []).map(x => `<img src="${esc(pub(x))}" alt="" loading="lazy">`).join('')}
     ${p.text ? `<p style="font:17px/1.4 Newsreader,Georgia,serif">${esc(p.text)}</p>` : ''}
-    ${p.audio_path ? `<audio controls src="${pub(p.audio_path)}" style="width:100%;margin-top:6px"></audio>` : ''}
+    ${p.audio_path ? `<audio controls src="${esc(pub(p.audio_path))}" style="width:100%;margin-top:6px"></audio>` : ''}
     ${(p.comments || []).map(c => `<div class="cm"><b>${esc(c.name)}${c.mine ? ' (you)' : ''}</b> ${esc(c.text)} ${c.mine ? `<button class="del" data-delc="${c.id}">Delete</button>` : ''}</div>`).join('')}
     ${canComment ? `<div class="cmrow"><input placeholder="Add a comment…" data-cin="${p.id}"><button data-cpost="${p.id}">Post</button></div>` : ''}</div>`).join('');
-  box.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { if (!confirm('Delete what you added?')) return; await sb.rpc('guest_delete_post', { pid: b.dataset.del, gtoken: token }); listPosts(); });
-  box.querySelectorAll('[data-delc]').forEach(b => b.onclick = async () => { await sb.rpc('guest_delete_comment', { cid: b.dataset.delc, gtoken: token }); listPosts(); });
+  box.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { if (!confirm('Delete what you added?')) return; const { error } = await sb.rpc('guest_delete_post', { pid: b.dataset.del, gtoken: token }); if (error) return alert('Could not delete: ' + error.message); listPosts(); });
+  box.querySelectorAll('[data-delc]').forEach(b => b.onclick = async () => { const { error } = await sb.rpc('guest_delete_comment', { cid: b.dataset.delc, gtoken: token }); if (error) return alert('Could not delete comment: ' + error.message); listPosts(); });
   box.querySelectorAll('[data-cpost]').forEach(b => b.onclick = async () => {
     const input = box.querySelector(`[data-cin="${b.dataset.cpost}"]`), body = input.value.trim();
     const name = ($('#nm') && $('#nm').value.trim()) || localStorage.getItem('ws_guest_name') || prompt('Your name, so the hosts know who commented') || '';
@@ -165,7 +168,9 @@ function drawPosts() {
     listPosts();
   });
 }
-load();
+load().catch(() => { app.textContent = 'Could not load this event. Check your connection and reload.'; });
+const refreshTimer = setInterval(() => { if (ev && !document.hidden) listPosts().catch(() => {}); }, 15000);
+window.addEventListener('pagehide', () => { clearInterval(refreshTimer); if (rec && rec.state === 'recording') rec.stop(); });
 </script>
 </body>
 </html>

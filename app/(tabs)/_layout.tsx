@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs, useFocusEffect } from 'expo-router';
 import { hasAccess, PAYMENTS_ENABLED } from '@/lib/payments';
 import { SymbolView } from 'expo-symbols';
 import { useAuth } from '@/lib/auth';
 import { C, F } from '@/lib/theme';
-import { Loading } from '@/components/ui';
+import { Loading, LoadError } from '@/components/ui';
 
 const icon = (ios: string, android: string) => {
   function TabIcon({ color }: { color: any }) {
@@ -16,11 +16,21 @@ const icon = (ios: string, android: string) => {
 
 export default function TabLayout() {
   const { session, ready } = useAuth();
-  const [paid, setPaid] = useState(true);
-  useEffect(() => { if (PAYMENTS_ENABLED && session) hasAccess().then(setPaid); }, [session]);
+  const userId = session?.user.id;
+  const [access, setAccess] = useState<{ userId: string; paid: boolean; error: string } | null>(null);
+  const accessRequest = useRef(0);
+  const checkAccess = useCallback(async () => {
+    if (!PAYMENTS_ENABLED || !userId) return;
+    const request = ++accessRequest.current;
+    try { const paid = await hasAccess(userId); if (request === accessRequest.current) setAccess({ userId, paid, error: '' }); }
+    catch (error) { if (request === accessRequest.current) setAccess({ userId, paid: false, error: error instanceof Error ? error.message : 'Could not check your subscription.' }); }
+  }, [userId]);
+  useFocusEffect(useCallback(() => { void checkAccess(); return () => { accessRequest.current += 1; }; }, [checkAccess]));
   if (!ready) return <Loading />;
   if (!session) return <Redirect href="/welcome" />;
-  if (!paid) return <Redirect href="/paywall" />;
+  if (PAYMENTS_ENABLED && access?.userId !== userId) return <Loading />;
+  if (PAYMENTS_ENABLED && access?.error) return <LoadError error={access.error} onRetry={checkAccess} />;
+  if (PAYMENTS_ENABLED && !access?.paid) return <Redirect href="/paywall" />;
   return (
     <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: C.green, tabBarInactiveTintColor: C.grey,
       tabBarStyle: { backgroundColor: C.cream, borderTopColor: C.line }, tabBarLabelStyle: { fontFamily: F.sansMedium, fontSize: 11 } }}>

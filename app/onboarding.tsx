@@ -8,6 +8,7 @@ import { countPhotos, findSuggestions, libraryAllowed } from '@/lib/suggest';
 import { getPrefs, setPrefs } from '@/lib/notify';
 import { PAYMENTS_ENABLED } from '@/lib/payments';
 import { C, F } from '@/lib/theme';
+import { Alert } from '@/lib/alert';
 
 const INTERESTS = ['Family', 'Travel', 'Friends', 'Couples', 'Events', 'Everyday life', 'Pets', 'Milestones'];
 const Steps = ({ n }: { n: number }) => (
@@ -34,12 +35,14 @@ export default function Onboarding() {
   };
   const aboutYou = async () => {
     setBusy(true);
-    try { await saveProfileChoices(picked, morning); const p = await getPrefs(); await setPrefs({ ...p, memories: morning }); } finally { setBusy(false); }
-    setStep(1);
+    try { await saveProfileChoices(picked, morning); const p = await getPrefs(); await setPrefs({ ...p, memories: morning }); setStep(1); }
+    catch (error) { Alert.alert('Could not save your choices', error instanceof Error ? error.message : 'Please try again.'); }
+    finally { setBusy(false); }
   };
   const allowPhotos = async () => {
     setBusy(true);
     try { if (await libraryAllowed(true)) { setFound({ photos: await countPhotos(), moments: (await findSuggestions(30)).length }); setStep(2); } else setStep(3); }
+    catch (error) { Alert.alert('Could not read photos', error instanceof Error ? error.message : 'Please try again, or choose Not now.'); }
     finally { setBusy(false); }
   };
   return (

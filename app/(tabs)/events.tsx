@@ -1,19 +1,18 @@
-import { useCallback, useState } from 'react';
+import { useFocusResource } from '@/lib/use-focus-resource';
+import { dateRange } from '@/lib/dates';
+
 import { View, Text } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
-import { Screen, H1, P, Card, Small, Empty, Btn, Loading } from '@/components/ui';
-import { listEvents, type EventRow } from '@/lib/api';
+import { router } from 'expo-router';
+import { LoadError, Screen, H1, P, Card, Small, Empty, Btn, Loading } from '@/components/ui';
+import { listEvents } from '@/lib/api';
 import { Image } from 'expo-image';
 import { eventUrl } from '@/lib/media';
 import { C, F } from '@/lib/theme';
 
-export const dateRange = (a: string | null, b: string | null) => {
-  const f = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  return a ? (b && b !== a ? `${f(a)} – ${f(b)}` : f(a)) : '';
-};
 export default function Events() {
-  const [events, setEvents] = useState<EventRow[] | null>(null);
-  useFocusEffect(useCallback(() => { listEvents().then(setEvents).catch(() => setEvents([])); }, []));
+  const { data: events, error, reload } = useFocusResource(listEvents);
+
+  if (error) return <LoadError error={error} onRetry={reload} />;
   if (!events) return <Loading />;
   return (
     <Screen>

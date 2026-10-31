@@ -1,27 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import { C, F } from '@/lib/theme';
 import { viewUrl, eventUrl } from '@/lib/media';
 import { transcribeFile } from '@/lib/speech';
-import { Btn, Field, Small, st } from './ui';
+import { Btn, Field, Small, st, runAction } from './ui';
 import type { Draft, Picked } from '@/lib/api';
+import { photoMetadata } from '@/lib/photo-metadata';
 
 export const fmt = (ms: number) => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 /** Reads the place and time saved in a photo, if there is one. */
 export function fromAsset(a: ImagePicker.ImagePickerAsset): Picked {
-  const ex: any = a.exif ?? {};
-  const gps = ex['{GPS}'] ?? ex;
-  let lat = gps.Latitude ?? gps.GPSLatitude, lng = gps.Longitude ?? gps.GPSLongitude;
-  const latRef = gps.LatitudeRef ?? gps.GPSLatitudeRef, lngRef = gps.LongitudeRef ?? gps.GPSLongitudeRef;
-  if (typeof lat === 'number' && latRef === 'S') lat = -lat;
-  if (typeof lng === 'number' && lngRef === 'W') lng = -lng;
-  const dt: string | undefined = ex['{Exif}']?.DateTimeOriginal ?? ex.DateTimeOriginal;
-  const takenAt = dt ? dt.replace(/^(\d{4}):(\d{2}):(\d{2}) /, '$1-$2-$3T') : null;
-  return { uri: a.uri, lat: typeof lat === 'number' ? lat : null, lng: typeof lng === 'number' ? lng : null, takenAt };
+  return { uri: a.uri, ...photoMetadata(a.exif ?? {}) };
 }
 
 /** A photo stored in Wholestory (private story file or event file). */
@@ -52,7 +46,7 @@ export function VoicePlayer({ path, event, durationMs, transcript }: { path: str
   const playing = status.playing;
   return (
     <View>
-      <Pressable onPress={async () => { await setAudioModeAsync({ playsInSilentMode: true }); if (playing) player.pause(); else { if (status.didJustFinish || status.currentTime >= (status.duration || 0)) player.seekTo(0); player.play(); } }}
+      <Pressable disabled={!uri} onPress={() => runAction(async () => { await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }); if (playing) player.pause(); else { if (status.didJustFinish || (status.duration > 0 && status.currentTime >= status.duration)) await player.seekTo(0); player.play(); } })}
         accessibilityLabel={playing ? 'Pause voice story' : 'Play voice story'}
         style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.greenSoft, borderRadius: 20, paddingVertical: 6, paddingLeft: 6, paddingRight: 14, alignSelf: 'flex-start', marginTop: 8 }}>
         <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
@@ -71,39 +65,72 @@ export function VoicePlayer({ path, event, durationMs, transcript }: { path: str
 }
 
 /** Pick photos, record or type: used for new stories, story updates and event posts. */
-export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: (d: Draft) => void; prompt?: string }) {
+export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; prompt?: string }) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const rec = useAudioRecorderState(recorder, 250);
   const localPlayer = useAudioPlayer(draft.audioUri ? { uri: draft.audioUri } : null);
   const localStatus = useAudioPlayerStatus(localPlayer);
   const [listening, setListening] = useState(false);
+  const operation = useRef(0);
+  const transcriber = useRef<AbortController | null>(null);
+  const recordingBusy = useRef(false);
+  useEffect(() => () => {
+    operation.current += 1;
+    transcriber.current?.abort();
+    setDraft(current => ({ ...current, recording: false, processingAudio: false }));
+  }, [setDraft]);
 
   const pick = async () => {
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 30, quality: 0.85, exif: true });
-    if (!r.canceled) setDraft({ ...draft, photos: [...draft.photos, ...r.assets.map(fromAsset)] });
+    if (!r.canceled) setDraft(current => ({ ...current, photos: [...current.photos, ...r.assets.map(fromAsset)] }));
   };
   const camera = async () => {
     const p = await ImagePicker.requestCameraPermissionsAsync();
     if (!p.granted) return Alert.alert('Camera not allowed', 'You can allow the camera for Wholestory in your phone Settings.');
     const r = await ImagePicker.launchCameraAsync({ quality: 0.85, exif: true });
-    if (!r.canceled) setDraft({ ...draft, photos: [...draft.photos, ...r.assets.map(fromAsset)] });
+    if (!r.canceled) setDraft(current => ({ ...current, photos: [...current.photos, ...r.assets.map(fromAsset)] }));
   };
   const toggleRec = async () => {
-    if (rec.isRecording) {
+    if (recordingBusy.current || listening) return;
+    recordingBusy.current = true;
+    const version = ++operation.current;
+    try {
+    if (recorder.isRecording) {
+      const ms = recorder.getStatus().durationMillis;
       await recorder.stop();
-      const uri = recorder.uri, ms = rec.durationMillis;
-      const next = { ...draft, audioUri: uri, durationMs: ms, transcript: '' };
-      setDraft(next);
-      if (uri) { setListening(true); const words = await transcribeFile(uri); setListening(false); if (words) setDraft({ ...next, transcript: words }); }
+      const uri = recorder.uri;
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      setDraft(current => ({ ...current, audioUri: uri, durationMs: ms, transcript: '', recording: false, processingAudio: true }));
+      if (uri) {
+        setListening(true);
+        transcriber.current = new AbortController();
+        const words = await transcribeFile(uri, 'en-GB', transcriber.current.signal);
+        if (operation.current === version) setDraft(current => current.audioUri === uri ? { ...current, transcript: current.transcript || words } : current);
+      }
       return;
     }
     const perm = await AudioModule.requestRecordingPermissionsAsync();
     if (!perm.granted) return Alert.alert('Microphone not allowed', 'You can allow the microphone for Wholestory in your phone Settings.');
     await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
     await recorder.prepareToRecordAsync();
+    localPlayer.pause();
     recorder.record();
+    setDraft(current => ({ ...current, recording: true }));
+    } catch (error) {
+      Alert.alert('Could not record', error instanceof Error ? error.message : 'Please try again.');
+      setDraft(current => ({ ...current, recording: false }));
+    } finally {
+      recordingBusy.current = false;
+      if (operation.current === version) {
+        setListening(false);
+        setDraft(current => ({ ...current, processingAudio: false }));
+      }
+    }
   };
-  const removeVoice = () => Alert.alert('Delete this recording?', '', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => setDraft({ ...draft, audioUri: null, durationMs: 0, transcript: '' }) }]);
+  const removeVoice = () => Alert.alert('Delete this recording?', '', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => {
+    operation.current += 1; transcriber.current?.abort(); setListening(false); localPlayer.pause();
+    setDraft(current => ({ ...current, audioUri: null, durationMs: 0, transcript: '', processingAudio: false }));
+  } }]);
 
   return (
     <View>
@@ -124,20 +151,20 @@ export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: 
       </View>
       <View style={[st.card, { alignItems: 'center', marginTop: 8 }]}>
         {prompt ? <Text style={{ fontFamily: F.serifItalic, fontSize: 16, color: C.ink, textAlign: 'center', marginBottom: 8 }}>“{prompt}”</Text> : null}
-        <Pressable onPress={toggleRec} accessibilityLabel={rec.isRecording ? 'Stop recording' : 'Record your voice'}
+        <Pressable onPress={toggleRec} disabled={listening} accessibilityLabel={rec.isRecording ? 'Stop recording' : 'Record your voice'}
           style={{ width: 86, height: 86, borderRadius: 43, backgroundColor: rec.isRecording ? C.red : '#C0533E', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ color: C.white, fontSize: rec.isRecording ? 22 : 30 }}>{rec.isRecording ? '■' : '🎙'}</Text>
         </Pressable>
         <Small style={{ marginTop: 8 }}>{rec.isRecording ? `Recording ${fmt(rec.durationMillis)} · tap to stop` : draft.audioUri ? `Recorded ${fmt(draft.durationMs)}` : 'Tap to tell it in your own voice'}</Small>
         {draft.audioUri && !rec.isRecording ? (
           <View style={{ flexDirection: 'row', gap: 18 }}>
-            <Btn kind="link" title={localStatus.playing ? 'Pause' : 'Play it back'} onPress={async () => { await setAudioModeAsync({ playsInSilentMode: true }); if (localStatus.playing) localPlayer.pause(); else { localPlayer.seekTo(0); localPlayer.play(); } }} />
+            <Btn kind="link" title={localStatus.playing ? 'Pause' : 'Play it back'} onPress={async () => { await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }); if (localStatus.playing) localPlayer.pause(); else { await localPlayer.seekTo(0); localPlayer.play(); } }} />
             <Pressable onPress={removeVoice} style={{ paddingVertical: 10 }}><Text style={{ fontFamily: F.sansMedium, color: C.red, textDecorationLine: 'underline' }}>Delete recording</Text></Pressable>
           </View>
         ) : null}
         {listening ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><ActivityIndicator color={C.green} /><Small>Turning your words into text…</Small></View> : null}
       </View>
-      {draft.audioUri && draft.transcript ? (
+      {draft.audioUri && !listening ? (
         <Field label="Your words, from the recording (you can edit them)" multiline value={draft.transcript} onChangeText={t => setDraft({ ...draft, transcript: t })} />
       ) : null}
       <Field placeholder="Or write a few words…" multiline value={draft.text} onChangeText={t => setDraft({ ...draft, text: t })} />

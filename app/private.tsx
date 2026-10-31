@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { Screen, H1, P, Btn, Card, Small, Empty, Field } from '@/components/ui';
+import { Screen, H1, P, Btn, Card, Small, Empty, Field, runAction } from '@/components/ui';
 import { Photo } from '@/components/media';
 import { listStories, type Story } from '@/lib/api';
 import { C, F } from '@/lib/theme';
@@ -22,7 +23,7 @@ function Keypad({ onDigit, onBack }: { onDigit: (d: string) => void; onBack: () 
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 14, marginTop: 6 }}>
       {keys.map((k, i) => k === '' ? <View key={i} style={{ width: 76, height: 60 }} /> :
-        <Pressable key={i} onPress={() => (k === '⌫' ? onBack() : onDigit(k))} accessibilityLabel={k === '⌫' ? 'Delete' : k}
+        <Pressable key={i} onPress={() => runAction(() => k === '⌫' ? onBack() : onDigit(k))} accessibilityLabel={k === '⌫' ? 'Delete' : k}
           style={({ pressed }) => ({ width: 76, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? C.greenSoft : C.card, borderWidth: 1, borderColor: C.line })}>
           <Text style={{ fontFamily: F.serif, fontSize: 24, color: C.navy }}>{k}</Text>
         </Pressable>)}
@@ -39,10 +40,13 @@ export default function Private() {
   const [resetting, setResetting] = useState(false); const [password, setPassword] = useState('');
   const [resetBusy, setResetBusy] = useState(false); const [error, setError] = useState('');
   useEffect(() => { SecureStore.getItemAsync(key).then(setSaved).catch(() => setError('Private albums are available in the iPhone app.')); }, [key]);
-  useFocusEffect(useCallback(() => { if (open) listStories({ private: true }).then(setStories); }, [open]));
-  const unlock = async () => { setPrivateUnlocked(true); setStories(await listStories({ private: true })); };
+  useFocusEffect(useCallback(() => { if (open) listStories({ private: true }).then(setStories).catch(e => setError(e.message ?? 'Could not load private stories.')); }, [open]));
+  const unlock = async () => {
+    try { setPrivateUnlocked(true); setError(''); setStories(await listStories({ private: true })); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Could not load private stories.'); }
+  };
   const faceId = async () => {
-    if (!(await LocalAuthentication.hasHardwareAsync()) || !(await LocalAuthentication.isEnrolledAsync())) return;
+    if (!(await LocalAuthentication.hasHardwareAsync()) || !(await LocalAuthentication.isEnrolledAsync())) return Alert.alert('Biometrics unavailable', 'Use your passcode, or set up Face ID or fingerprint recognition in device settings.');
     const r = await LocalAuthentication.authenticateAsync({ promptMessage: 'Open your private albums', fallbackLabel: 'Use passcode' });
     if (r.success) unlock();
   };
@@ -88,6 +92,7 @@ export default function Private() {
   return (
     <Screen>
       <H1>Private</H1>
+      {error ? <P accessibilityRole="alert">{error}</P> : null}
       <P muted style={{ marginBottom: 12 }}>Only you can see these. They never appear in memories, the map or reminders.</P>
       <Btn title="New private story" onPress={() => router.push({ pathname: '/story/new', params: { private: '1' } })} />
       {!stories.length ? <Empty title="No private stories yet" body="Make a new one here, or move a story in from its ⋯ menu." /> : null}

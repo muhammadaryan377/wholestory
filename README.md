@@ -65,7 +65,7 @@ The anon key is designed to be public. Your data is protected by the privacy rul
 
 ## Step 3 – Put the guest page online (Netlify), about 5 minutes
 
-1. Open `guest-web/index.html` in a text editor and fill in `SUPABASE_URL` and `SUPABASE_ANON_KEY` near the bottom.
+1. Run `node scripts/configure-guest.cjs` to generate guest-web/config.js from your real public Supabase values in .env. Include this generated file when uploading the guest-web folder.
 2. Go to app.netlify.com/drop and drag the whole `guest-web` folder onto the page.
 3. Copy the site address it gives you (for example `https://wholestory-guests.netlify.app`) into
    `EXPO_PUBLIC_GUEST_PAGE_URL` in `eas.json`. Every event's QR code will point there.
@@ -144,3 +144,7 @@ npx tsc --noEmit       # check the code for mistakes
 - Turn email confirmation back on, publish the Privacy Policy and Terms, fill in App Store privacy labels
 - Add payments (RevenueCat or StoreKit) with the agreed prices: £5.99 / $6.99 a month, £39.99 / $49.99 a year
 - Move event photos to private storage with expiring links (they are public-by-link in this test build)
+
+## Existing feature repairs
+
+See [REPAIR-NOTES.md](REPAIR-NOTES.md) for the recovery-link setup, required database migrations, cleanup worker deployment and current test coverage.

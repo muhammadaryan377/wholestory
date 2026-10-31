@@ -7,6 +7,15 @@ import { getEvent, getStory, listEvents, listStories } from './api';
 
 const safe = (s: string) => s.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'item';
 async function bytes(bucket: 'media' | 'event-media', path: string) {
+  if (Platform.OS !== 'web') {
+    const signed = await supabase.storage.from(bucket).createSignedUrl(path, 600);
+    if (signed.error || !signed.data) throw new Error('Could not download a file. Please try again.');
+    const destination = new File(Paths.cache, `ws-export-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`);
+    try {
+      const downloaded = await File.downloadFileAsync(signed.data.signedUrl, destination);
+      return new Uint8Array(await downloaded.arrayBuffer());
+    } finally { if (destination.exists) destination.delete(); }
+  }
   const { data, error } = await supabase.storage.from(bucket).download(path);
   if (error || !data) throw new Error('Could not download a file. Check your connection and try again.');
   return new Uint8Array(await data.arrayBuffer());
@@ -24,6 +33,7 @@ async function saveAndShare(zip: JSZip, name: string) {
   const file = new File(Paths.cache, name);
   if (file.exists) file.delete();
   await file.write(out);
+  if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is unavailable on this device.');
   await Sharing.shareAsync(file.uri, { mimeType: 'application/zip', dialogTitle: name });
 }
 
@@ -36,6 +46,7 @@ export async function exportMyData(onProgress?: (msg: string) => void) {
     onProgress?.(`Story ${++n} of ${stories.length}`);
     const { entries } = await getStory(s.id);
     const dir = zip.folder(`Stories/${safe(s.title)}-${s.story_date}-${s.id}`)!;
+    dir.file('metadata.json', JSON.stringify({ story: s, entries }, null, 2));
     let text = `${s.title}\n${s.story_date}${s.private ? ' (private)' : ''}\n\n`;
     let i = 0;
     for (const e of entries) {
@@ -53,7 +64,9 @@ export async function exportMyData(onProgress?: (msg: string) => void) {
   await saveAndShare(zip, 'Wholestory-my-data.zip');
 }
 async function addEvent(dir: JSZip, eventId: string) {
-  const { ev, posts } = await getEvent(eventId);
+  const { ev, posts, moments } = await getEvent(eventId);
+  dir.file('metadata.json', JSON.stringify({ event: ev, moments, posts }, null, 2));
+  if (ev.cover_path) dir.file(`cover.${ev.cover_path.split('.').pop()}`, await bytes('event-media', ev.cover_path));
   let text = `${ev.name}\n\n`, i = 0;
   for (const p of posts.slice().reverse()) {
     text += `[${new Date(p.created_at).toLocaleString('en-GB')}] ${p.author_user ? 'Host' : p.guest_name || 'Guest'}\n${p.text ? p.text + '\n' : ''}\n`;

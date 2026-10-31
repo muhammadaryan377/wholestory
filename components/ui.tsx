@@ -1,8 +1,15 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, ViewStyle, TextInputProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { C, F, S } from '@/lib/theme';
+import { Alert } from '@/lib/alert';
+
+export function runAction(action?: () => unknown) {
+  try {
+    return Promise.resolve(action?.()).then(() => {}).catch(error => Alert.alert('Could not complete', error?.message ?? 'Please try again.'));
+  } catch (error) { Alert.alert('Could not complete', error instanceof Error ? error.message : 'Please try again.'); return Promise.resolve(); }
+}
 
 export function Thread({ width = 120 }: { width?: number }) {
   return (
@@ -28,8 +35,9 @@ export const Small = ({ children, style }: any) => <Text style={[st.small, style
 
 export function Btn({ title, onPress, kind = 'primary', busy, disabled, style }: { title: string; onPress?: () => void; kind?: 'primary' | 'outline' | 'danger' | 'link'; busy?: boolean; disabled?: boolean; style?: ViewStyle }) {
   const k = kind;
+  const pending = useRef(false);
   return (
-    <Pressable onPress={busy || disabled ? undefined : onPress} accessibilityRole="button"
+    <Pressable onPress={() => { if (pending.current) return; pending.current = true; void runAction(onPress).finally(() => { pending.current = false; }); }} disabled={busy || disabled} accessibilityRole="button" accessibilityState={{ disabled: !!(busy || disabled), busy: !!busy }}
       style={({ pressed }) => [k === 'link' ? st.link : st.btn, k === 'outline' && st.btnOutline, k === 'danger' && { backgroundColor: C.red }, (pressed || disabled) && { opacity: 0.6 }, style]}>
       {busy ? <ActivityIndicator color={k === 'outline' ? C.green : C.white} /> :
         <Text style={k === 'link' ? st.linkText : [st.btnText, k === 'outline' && { color: C.ink }]}>{title}</Text>}
@@ -37,7 +45,7 @@ export function Btn({ title, onPress, kind = 'primary', busy, disabled, style }:
   );
 }
 export const Card = ({ children, style, onPress }: { children: React.ReactNode; style?: ViewStyle; onPress?: () => void }) =>
-  onPress ? <Pressable onPress={onPress} style={({ pressed }) => [st.card, pressed && { opacity: 0.85 }, style]}>{children}</Pressable> : <View style={[st.card, style]}>{children}</View>;
+  onPress ? <Pressable onPress={() => runAction(onPress)} style={({ pressed }) => [st.card, pressed && { opacity: 0.85 }, style]}>{children}</Pressable> : <View style={[st.card, style]}>{children}</View>;
 
 export function Field(props: TextInputProps & { label?: string }) {
   return (
@@ -51,20 +59,20 @@ export function ToggleRow({ title, sub, value, onChange }: { title: string; sub?
   return (
     <View style={st.row}>
       <View style={{ flex: 1, paddingRight: 12 }}><Text style={st.rowTitle}>{title}</Text>{sub ? <Text style={st.small}>{sub}</Text> : null}</View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: C.green, false: '#CFCCC4' }} thumbColor={C.white} />
+      <Switch value={value} onValueChange={v => runAction(() => onChange(v))} trackColor={{ true: C.green, false: '#CFCCC4' }} thumbColor={C.white} />
     </View>
   );
 }
 export function NavRow({ title, sub, onPress, danger }: { title: string; sub?: string; onPress: () => void; danger?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [st.row, pressed && { opacity: 0.7 }]}>
+    <Pressable onPress={() => runAction(onPress)} style={({ pressed }) => [st.row, pressed && { opacity: 0.7 }]}>
       <View style={{ flex: 1 }}><Text style={[st.rowTitle, danger && { color: C.red }]}>{title}</Text>{sub ? <Text style={st.small}>{sub}</Text> : null}</View>
       <Text style={{ color: C.faint, fontSize: 20 }}>›</Text>
     </Pressable>
   );
 }
 export function Chip({ label, on, onPress }: { label: string; on?: boolean; onPress?: () => void }) {
-  return <Pressable onPress={onPress} style={[st.chip, on && { backgroundColor: C.green, borderColor: C.green }]}><Text style={[st.chipText, on && { color: C.white }]}>{label}</Text></Pressable>;
+  return <Pressable onPress={() => runAction(onPress)} style={[st.chip, on && { backgroundColor: C.green, borderColor: C.green }]}><Text style={[st.chipText, on && { color: C.white }]}>{label}</Text></Pressable>;
 }
 export function Empty({ title, body, action, onAction, secondary, onSecondary }: { title: string; body: string; action?: string; onAction?: () => void; secondary?: string; onSecondary?: () => void }) {
   return (
@@ -78,6 +86,9 @@ export function Empty({ title, body, action, onAction, secondary, onSecondary }:
   );
 }
 export const Loading = () => <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.cream }}><ActivityIndicator color={C.green} /></View>;
+export function LoadError({ error, onRetry }: { error: string; onRetry: () => void }) {
+  return <Screen><H1>Could not load</H1><P accessibilityRole="alert">{error}</P><Btn title="Try again" onPress={onRetry} /></Screen>;
+}
 
 export const st = StyleSheet.create({
   h1: { fontFamily: F.serif, fontSize: 30, color: C.navy, marginBottom: 6, letterSpacing: -0.3 },

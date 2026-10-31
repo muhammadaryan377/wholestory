@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
-import { Alert, Linking } from 'react-native';
+import { Linking } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { router, useFocusEffect } from 'expo-router';
-import { Screen, H1, H2, Field, Btn, NavRow, Small } from '@/components/ui';
+import { LoadError, Screen, H1, H2, Field, Btn, NavRow, Small } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
-import { deleteAccount, myName, saveName } from '@/lib/api';
+import { deleteAccount, myName, saveName, savePushToken } from '@/lib/api';
 import { exportMyData } from '@/lib/exporter';
 import { PAYMENTS_ENABLED } from '@/lib/payments';
 
@@ -13,12 +14,22 @@ const SUPPORT = process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'support@wholestory.app
 
 export default function Settings() {
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [busy, setBusy] = useState(false); const [exporting, setExporting] = useState('');
-  useFocusEffect(useCallback(() => { myName().then(setName); supabase.auth.getUser().then(r => setEmail(r.data.user?.email ?? '')); }, []));
+  const [loadError, setLoadError] = useState('');
+  const load = useCallback(async () => {
+    try {
+      setLoadError('');
+      const [name, user] = await Promise.all([myName(), supabase.auth.getUser()]);
+      if (user.error) throw user.error;
+      setName(name); setEmail(user.data.user?.email ?? '');
+    } catch (e) { setLoadError(e instanceof Error ? e.message : 'Could not load account details.'); }
+  }, []);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
   const save = async () => { setBusy(true); try { await saveName(name.trim()); Alert.alert('Saved'); } finally { setBusy(false); } };
   const del = () => Alert.alert('Delete your account?', 'This deletes your account, stories, photos and recordings from Wholestory. Your originals stay on your phone. This cannot be undone.', [
     { text: 'Cancel', style: 'cancel' },
     { text: 'Delete everything', style: 'destructive', onPress: async () => { try { await deleteAccount(); router.replace('/welcome'); } catch (e: any) { Alert.alert('Could not delete', e.message); } } },
   ]);
+  if (loadError) return <LoadError error={loadError} onRetry={load} />;
   return (
     <Screen>
       <H1>Settings</H1>
@@ -39,7 +50,12 @@ export default function Settings() {
       <NavRow title="Terms of Use" onPress={() => Linking.openURL(TERMS_URL)} />
       <H2 style={{ marginTop: 14 }}>Help</H2>
       <NavRow title="Contact us or send feedback" sub={SUPPORT} onPress={() => Linking.openURL(`mailto:${SUPPORT}?subject=Wholestory%20test%20feedback`)} />
-      <Btn title="Log out" kind="outline" onPress={async () => { await supabase.auth.signOut(); router.replace('/welcome'); }} style={{ marginTop: 18 }} />
+      <Btn title="Log out" kind="outline" onPress={async () => {
+        await savePushToken(null).catch(() => {});
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        router.replace('/welcome');
+      }} style={{ marginTop: 18 }} />
       <NavRow title="Delete my account" danger onPress={del} />
       <Small style={{ textAlign: 'center', marginTop: 10 }}>Wholestory test version</Small>
     </Screen>

@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusResource } from '@/lib/use-focus-resource';
+import { parseDate } from '@/lib/dates';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
-import { router, useFocusEffect, Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker } from 'react-native-maps';
-import { Btn, Chip, Empty, Loading, Small, Thread } from '@/components/ui';
+import { Btn, Chip, Empty, Loading, LoadError, Small, Thread } from '@/components/ui';
 import { Photo } from '@/components/media';
 import { getStory, listStories, type Entry, type Story } from '@/lib/api';
 import { C, F, S } from '@/lib/theme';
@@ -26,12 +28,11 @@ function StoryPin({ story, selected }: { story: Story; selected: boolean }) {
 }
 
 export default function StoriesMap() {
-  const [stories, setStories] = useState<Story[] | null>(null);
+  const { data: stories, error, reload } = useFocusResource(listStories);
   const [sel, setSel] = useState<Story | null>(null);
   const [selEntries, setSelEntries] = useState<Entry[]>([]);
   const [tracking, setTracking] = useState(true);
   const mapRef = useRef<MapView>(null);
-  useFocusEffect(useCallback(() => { listStories().then(setStories).catch(() => setStories([])); }, []));
   // let the photo markers draw, then stop redrawing them (keeps the map smooth)
   useEffect(() => { const t = setTimeout(() => setTracking(false), 2500); return () => clearTimeout(t); }, [stories, sel?.id]);
   useEffect(() => {
@@ -55,6 +56,7 @@ export default function StoriesMap() {
     </SafeAreaView>
   );
 
+  if (error) return <LoadError error={error} onRetry={reload} />;
   if (!stories) return <Loading />;
   const placed = stories.filter(s => s.lat != null && s.lng != null);
   const unplaced = stories.length - placed.length;
@@ -95,7 +97,7 @@ export default function StoriesMap() {
             <Text style={{ fontFamily: F.serif, fontSize: 22, color: C.navy, flex: 1 }} numberOfLines={1}>{sel.title}</Text>
             <Pressable onPress={() => router.push(`/story/${sel.id}`)} hitSlop={8}><Text style={{ fontFamily: F.sansMedium, color: C.green }}>Open ›</Text></Pressable>
           </View>
-          <Small>{sel.entryCount ?? 0} {sel.entryCount === 1 ? 'moment' : 'moments'} · {selEntries.reduce((n, e) => n + e.photos.length, 0)} photos · {new Date(sel.story_date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</Small>
+          <Small>{sel.entryCount ?? 0} {sel.entryCount === 1 ? 'moment' : 'moments'} · {selEntries.reduce((n, e) => n + e.photos.length, 0)} photos · {parseDate(sel.story_date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</Small>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginHorizontal: -S.pad, paddingLeft: S.pad }}>
             {photos.map(p => <Pressable key={p.id} onPress={() => router.push(`/story/${sel.id}`)} style={{ marginRight: 8 }}><Photo path={p.path} size={78} /></Pressable>)}
           </ScrollView>

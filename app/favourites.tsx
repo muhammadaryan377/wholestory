@@ -1,15 +1,17 @@
-import { useCallback, useState } from 'react';
+import { useFocusResource } from '@/lib/use-focus-resource';
+
 import { Pressable, View, useWindowDimensions } from 'react-native';
-import { useFocusEffect } from 'expo-router';
-import { Screen, H1, P, Small, Empty, Loading } from '@/components/ui';
+
+import { LoadError, Screen, H1, P, Small, Empty, Loading } from '@/components/ui';
 import { Photo } from '@/components/media';
-import { listFavourites, type FavPhoto } from '@/lib/api';
+import { listFavourites } from '@/lib/api';
 import { openPhoto } from '@/lib/open';
 
 export default function Favourites() {
-  const [items, setItems] = useState<FavPhoto[] | null>(null);
+  const { data: items, error, reload } = useFocusResource(listFavourites);
   const { width } = useWindowDimensions(); const size = Math.floor((width - 40 - 12) / 3);
-  useFocusEffect(useCallback(() => { listFavourites().then(setItems).catch(() => setItems([])); }, []));
+
+  if (error) return <LoadError error={error} onRetry={reload} />;
   if (!items) return <Loading />;
   return (
     <Screen>

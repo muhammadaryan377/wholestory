@@ -1,23 +1,27 @@
+import { parseDate } from '@/lib/dates';
 import { useCallback, useState } from 'react';
-import { Alert, Text, View, Pressable, useWindowDimensions } from 'react-native';
+import { Text, View, Pressable, useWindowDimensions } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { router, useFocusEffect, useLocalSearchParams, Stack } from 'expo-router';
-import { Screen, H2, Small, Card, Empty, Loading, Btn, ToggleRow } from '@/components/ui';
+import { LoadError, Screen, H2, Small, Card, Empty, Loading, Btn, ToggleRow } from '@/components/ui';
 import { Photo } from '@/components/media';
 import { deletePerson, getPerson, photosInStories, setPersonHidden, type Person, type Story, type StoredPhoto } from '@/lib/api';
 import { openPhoto } from '@/lib/open';
 import { C, F, S } from '@/lib/theme';
 
 export default function PersonPage() {
+  const [loadError, setLoadError] = useState('');
   const { id } = useLocalSearchParams<{ id: string }>();
   const [data, setData] = useState<{ person: Person & { hidden_from_memories?: boolean }; stories: Story[]; photos: (StoredPhoto & { story_id: string })[] } | null>(null);
   const { width } = useWindowDimensions(); const tile = Math.floor((width - S.pad * 2 - 12) / 3);
   const load = useCallback(async () => {
-    try { const r = await getPerson(id); setData({ ...r, photos: await photosInStories(r.stories.map(s => s.id), 12) }); } catch { router.back(); }
+    try { setLoadError(''); const r = await getPerson(id); setData({ ...r, photos: await photosInStories(r.stories.map(s => s.id), 12) }); } catch (e) { setLoadError(e instanceof Error ? e.message : 'Could not load. Please try again.'); }
   }, [id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
+  if (loadError) return <LoadError error={loadError} onRetry={load} />;
   if (!data) return <Loading />;
   const { person, stories, photos } = data;
-  const since = stories.length ? new Date(stories[0].story_date) : null;
+  const since = stories.length ? parseDate(stories[0].story_date) : null;
   const years = since ? new Date().getFullYear() - since.getFullYear() : 0;
   const titleOf = (sid: string) => stories.find(s => s.id === sid)?.title;
   const del = () => Alert.alert(`Remove ${person.name}?`, 'Their page is removed. Your stories stay as they are.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: async () => { await deletePerson(person.id); router.back(); } }]);
@@ -45,7 +49,7 @@ export default function PersonPage() {
             {s.cover ? <Photo path={s.cover} size={52} /> : <View style={{ width: 52, height: 52, borderRadius: 10, backgroundColor: '#E9E4D9' }} />}
             <View style={{ flex: 1 }}>
               <Text style={{ fontFamily: F.serif, fontSize: 16, color: C.navy }}>{i === 0 ? 'First story together: ' : ''}{s.title}</Text>
-              <Small>{new Date(s.story_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Small>
+              <Small>{parseDate(s.story_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Small>
             </View>
             <Text style={{ color: C.faint, fontSize: 18 }}>›</Text>
           </Card>

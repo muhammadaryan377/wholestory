@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Alert, View, Pressable, Text, TextInput } from 'react-native';
+import { View, Pressable, Text, TextInput } from 'react-native';
+import { Alert } from '@/lib/alert';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Screen, H1, H2, P, Field, Btn, Chip, Small } from '@/components/ui';
 import { createEvent } from '@/lib/api';
 import { C, F } from '@/lib/theme';
+import { dateInput } from '@/lib/dates';
 
 const TYPES = ['Wedding', 'Birthday', 'Holiday', 'Family gathering', 'Graduation', 'Other'];
 type M = { name: string; time: string };
@@ -22,10 +24,14 @@ export default function NewEvent() {
   const [moments, setMoments] = useState<M[]>(DEFAULTS.Wedding); const [newM, setNewM] = useState(''); const [busy, setBusy] = useState(false);
   const [cover, setCoverUri] = useState<string | null>(null);
   const pickCover = async () => { const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85, allowsEditing: true, aspect: [16, 9] }); if (!r.canceled) setCoverUri(r.assets[0].uri); };
-  const iso = (s: string) => { const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : null; };
+  const iso = dateInput;
   const save = async () => {
+    if (busy) return;
     if (!name.trim()) return Alert.alert('Name your event', 'For example “Maya & Tom’s Wedding”.');
     if (start && !iso(start)) return Alert.alert('Check the date', 'Use day/month/year, e.g. 15/09/2026.');
+    if (end && !iso(end)) return Alert.alert('Check the end date', 'Enter a valid day/month/year.');
+    if (end && !start) return Alert.alert('Add a start date', 'Choose the start date before the end date.');
+    if (start && end && iso(end)! < iso(start)!) return Alert.alert('Check the dates', 'The end date cannot be before the start date.');
     setBusy(true);
     try {
       const id = await createEvent({ name: name.trim(), kind, place: place.trim(), starts_on: iso(start), ends_on: iso(end) ?? iso(start) }, moments.map(m => ({ day: 1, time_label: m.time.trim(), name: m.name })), cover);
