@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Alert } from '@/lib/alert';
+import * as Device from 'expo-device';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
@@ -85,10 +86,25 @@ export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: 
     if (!r.canceled) setDraft(current => ({ ...current, photos: [...current.photos, ...r.assets.map(fromAsset)] }));
   };
   const camera = async () => {
-    const p = await ImagePicker.requestCameraPermissionsAsync();
-    if (!p.granted) return Alert.alert('Camera not allowed', 'You can allow the camera for Wholestory in your phone Settings.');
-    const r = await ImagePicker.launchCameraAsync({ quality: 0.85, exif: true });
-    if (!r.canceled) setDraft(current => ({ ...current, photos: [...current.photos, ...r.assets.map(fromAsset)] }));
+    if (!Device.isDevice) {
+      Alert.alert(
+        'Camera Unavailable in Simulator',
+        'The iOS Simulator does not have a camera. Would you like to select a photo from your photo library instead?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Choose Photo', onPress: pick },
+        ]
+      );
+      return;
+    }
+    try {
+      const p = await ImagePicker.requestCameraPermissionsAsync();
+      if (!p.granted) return Alert.alert('Camera not allowed', 'You can allow the camera for Wholestory in your phone Settings.');
+      const r = await ImagePicker.launchCameraAsync({ quality: 0.85, exif: true });
+      if (!r.canceled) setDraft(current => ({ ...current, photos: [...current.photos, ...r.assets.map(fromAsset)] }));
+    } catch (err: any) {
+      Alert.alert('Camera error', err?.message || 'Could not open camera.');
+    }
   };
   const toggleRec = async () => {
     if (recordingBusy.current || listening) return;
