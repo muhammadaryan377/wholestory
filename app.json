@@ -113,15 +113,15 @@
       "typedRoutes": true
     },
     "extra": {
-      "eas": {
-        "projectId": "5266ca09-ed49-4a5f-b460-9cfa60c0787e"
-      },
       "router": {
         "asyncRoutes": {
           "web": true
         }
+      },
+      "eas": {
+        "projectId": "bc585165-0b57-4ec6-94db-31cbf6319030"
       }
     },
-    "owner": "aryan12m"
+    "owner": "sabirmughal"
   }
 }
