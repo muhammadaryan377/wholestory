@@ -59,6 +59,7 @@ function AppStack() {
         <Stack.Screen name="sign-in" options={{ title: 'Log in' }} />
         <Stack.Screen name="sign-up" options={{ title: 'Create your account' }} />
         <Stack.Screen name="reset-password" options={{ title: 'Reset password' }} />
+        <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         <Stack.Screen name="join/[code]" options={{ title: 'Join a story' }} />
         <Stack.Screen name="setup" options={{ headerShown: false }} />
         <Stack.Protected guard={!!session}>
