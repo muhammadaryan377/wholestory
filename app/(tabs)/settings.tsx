@@ -7,12 +7,14 @@ import { supabase } from '@/lib/supabase';
 import { deleteAccount, myName, saveName, savePushToken } from '@/lib/api';
 import { exportMyData } from '@/lib/exporter';
 import { PAYMENTS_ENABLED } from '@/lib/payments';
+import { useAuth } from '@/lib/auth';
 
 const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL ?? 'https://wholestory.app/privacy';
 const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://wholestory.app/terms';
 const SUPPORT = process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'support@wholestory.app';
 
 export default function Settings() {
+  const { session } = useAuth();
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [busy, setBusy] = useState(false); const [exporting, setExporting] = useState('');
   const [loadError, setLoadError] = useState('');
   const load = useCallback(async () => {
