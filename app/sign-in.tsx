@@ -3,8 +3,11 @@ import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { Screen, H1, P, Btn, Field } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
+import { SocialAuthButtons } from '@/components/social-auth-buttons';
+import { useAuth } from '@/lib/auth';
 
 export default function SignIn() {
+  const { session } = useAuth();
   const [email, setEmail] = useState(''); const [pw, setPw] = useState(''); const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const go = async () => {
@@ -48,6 +51,8 @@ export default function SignIn() {
       {message ? <P accessibilityRole="alert" style={{ marginBottom: 12 }}>{message}</P> : null}
       <Btn title="Log in" onPress={go} busy={busy} />
       <Btn kind="link" title="Forgot your password?" disabled={busy} onPress={reset} />
+      {session?.user.is_anonymous ? <P muted style={{ marginTop: 12 }}>Signing in replaces this preview guest account. Guest stories are not transferred automatically.</P> : null}
+      <SocialAuthButtons onError={setMessage} />
     </Screen>
   );
 }
