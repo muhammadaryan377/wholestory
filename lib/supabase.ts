@@ -8,5 +8,5 @@ export const isConfigured = /^https?:\/\/[^/]+$/.test(url) && !!anonKey && !/YOU
 export const GUEST_PAGE_URL = process.env.EXPO_PUBLIC_GUEST_PAGE_URL ?? 'https://wholestory.app/e';
 
 export const supabase = createClient(isConfigured ? url : 'https://example.supabase.co', isConfigured ? anonKey : 'missing-key', {
-  auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false },
+  auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false, flowType: 'pkce' },
 });

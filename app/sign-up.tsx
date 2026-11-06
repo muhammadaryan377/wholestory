@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Screen, H1, P, Btn, Field, Small } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { saveName } from '@/lib/api';
+import { SocialAuthButtons } from '@/components/social-auth-buttons';
 
 export default function SignUp() {
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [pw, setPw] = useState(''); const [busy, setBusy] = useState(false);
@@ -37,6 +38,7 @@ export default function SignUp() {
       <Field label="Create a password" value={pw} onChangeText={setPw} placeholder="At least 8 characters" secureTextEntry autoComplete="new-password" />
       <Small style={{ marginBottom: 10 }}>Your memories are private unless you choose to share them. By continuing you agree to the Terms and Privacy Policy.</Small>
       <Btn title="Create account" onPress={go} busy={busy} />
+      <SocialAuthButtons onError={setMessage} />
       {message ? <P accessibilityRole="alert">{message}</P> : null}
       <Btn title="Already have an account? Log in" kind="link" onPress={() => router.replace('/sign-in')} />
     </Screen>

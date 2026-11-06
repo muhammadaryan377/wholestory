@@ -54,7 +54,7 @@ export async function saveName(name: string) {
 }
 export async function ensureProfile() {
   const u = await me(); if (!u) throw new Error('Please sign in again');
-  must(await supabase.from('profiles').upsert({ id: u.id, name: u.user_metadata?.name ?? '' }, { onConflict: 'id', ignoreDuplicates: true }));
+  must(await supabase.from('profiles').upsert({ id: u.id, name: u.user_metadata?.name ?? u.user_metadata?.full_name ?? '' }, { onConflict: 'id', ignoreDuplicates: true }));
 }
 async function writeProfile(patch: Record<string, unknown>) {
   const u = await me(); if (!u) throw new Error('Please sign in again');
