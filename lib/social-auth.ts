@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { isConfigured, supabase } from './supabase';
+import { signInWithNativeApple } from './native-apple-auth';
 
 // Supabase handles the provider's client secret server-side. Never place OAuth
 // client secrets or the Supabase service-role key inside this app.
@@ -12,6 +13,12 @@ WebBrowser.maybeCompleteAuthSession();
 /** Returns true after a native session is created; false on cancel/web redirect. */
 export async function signInWithSocialProvider(provider: SocialProvider): Promise<boolean> {
   if (!isConfigured) throw new Error('Supabase is not configured for this build.');
+
+  // iOS uses Apple's native system sign-in and verifies the identity token with Supabase.
+  // Android and web retain the browser OAuth flow.
+  if (provider === 'apple' && Platform.OS === 'ios') {
+    return signInWithNativeApple();
+  }
 
   // Expo Router accepts this custom scheme on installed development / EAS builds.
   // The same exact address must be allowlisted in Supabase Auth > Redirect URLs.
