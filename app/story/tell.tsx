@@ -1,6 +1,7 @@
 import { localDate, parseDate } from '@/lib/dates';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/components/typography';
 import { Alert } from '@/lib/alert';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';

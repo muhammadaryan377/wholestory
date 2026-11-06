@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { useCallback, useReducer, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { Text } from '@/components/typography';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Screen, H1, P, Btn, Chip, ToggleRow, Small, Thread } from '@/components/ui';
@@ -9,10 +10,14 @@ import { getPrefs, setPrefs } from '@/lib/notify';
 import { PAYMENTS_ENABLED } from '@/lib/payments';
 import { C, F } from '@/lib/theme';
 import { Alert } from '@/lib/alert';
+import { BackButton } from '@/components/back-button';
+import { useHardwareBack } from '@/lib/use-hardware-back';
+import { flowHistory } from '@/lib/flow-history';
+import { openHome } from '@/lib/navigation';
 
 const INTERESTS = ['Family', 'Travel', 'Friends', 'Couples', 'Events', 'Everyday life', 'Pets', 'Milestones'];
 const Steps = ({ n }: { n: number }) => (
-  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+  <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 18 }}>
     {['About you', 'Photos', 'Plan'].map((t, i) => (
       <View key={t} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: i < n ? C.green : i === n ? C.navy : '#D8D2C6', alignItems: 'center', justifyContent: 'center' }}>
@@ -25,13 +30,27 @@ const Steps = ({ n }: { n: number }) => (
 );
 
 export default function Onboarding() {
-  const [step, setStep] = useState(0);
+  const [history, dispatch] = useReducer(flowHistory, [0]);
+  const step = history[history.length - 1];
+  const setStep = (next: number) => dispatch({ type: 'next', step: next });
   const [picked, setPicked] = useState<string[]>(['Family']); const [morning, setMorning] = useState(true);
   const [found, setFound] = useState<{ photos: number; moments: number } | null>(null); const [busy, setBusy] = useState(false);
+  const previous = useCallback(() => {
+    if (busy) return true;
+    if (history.length > 1) dispatch({ type: 'back' });
+    else openHome();
+    return true;
+  }, [busy, history.length]);
+  useHardwareBack(previous);
   const finish = async (to?: string) => {
-    await AsyncStorage.setItem('ws_onboarded', '1');
-    if (PAYMENTS_ENABLED) return router.replace('/paywall');
-    router.replace('/(tabs)'); if (to) setTimeout(() => router.push(to as any), 300);
+    if (busy) return;
+    setBusy(true);
+    try {
+      await AsyncStorage.setItem('ws_onboarded', '1');
+      if (PAYMENTS_ENABLED) return router.replace('/paywall');
+      openHome(to as '/suggestions' | undefined);
+    } catch (error) { Alert.alert('Could not finish setup', error instanceof Error ? error.message : 'Please try again.'); }
+    finally { setBusy(false); }
   };
   const aboutYou = async () => {
     setBusy(true);
@@ -46,7 +65,8 @@ export default function Onboarding() {
     finally { setBusy(false); }
   };
   return (
-    <Screen>
+    <Screen resetKey={step}>
+      <BackButton onPress={previous} disabled={busy} />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={{ fontFamily: F.serif, fontSize: 24, color: C.navy }}>Wholestory</Text><Thread width={110} />
       </View>
@@ -65,7 +85,7 @@ export default function Onboarding() {
         <P muted style={{ marginBottom: 14 }}>Allow access and Wholestory will find trips, days out and moments worth telling. It all happens on your phone; nothing is uploaded unless you add it.</P>
         {busy ? <View style={{ alignItems: 'center', padding: 20 }}><ActivityIndicator color={C.green} /><Small style={{ marginTop: 8 }}>Looking through your photos…</Small></View> : null}
         <Btn title="Allow photo access" onPress={allowPhotos} busy={busy} />
-        <Btn kind="link" title="Not now" onPress={() => setStep(3)} />
+        <Btn kind="link" title="Not now" disabled={busy} onPress={() => setStep(3)} />
       </>) : null}
       {step === 2 && found ? (<>
         <H1>We found {found.photos.toLocaleString('en-GB')} photos</H1>

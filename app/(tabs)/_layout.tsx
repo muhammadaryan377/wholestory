@@ -32,7 +32,7 @@ export default function TabLayout() {
   if (PAYMENTS_ENABLED && access?.error) return <LoadError error={access.error} onRetry={checkAccess} />;
   if (PAYMENTS_ENABLED && !access?.paid) return <Redirect href="/paywall" />;
   return (
-    <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: C.green, tabBarInactiveTintColor: C.grey,
+    <Tabs screenOptions={{ headerShown: false, tabBarHideOnKeyboard: true, tabBarActiveTintColor: C.green, tabBarInactiveTintColor: C.grey,
       tabBarStyle: { backgroundColor: C.cream, borderTopColor: C.line }, tabBarLabelStyle: { fontFamily: F.sansMedium, fontSize: 11 } }}>
       <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: icon('sun.max', 'wb_sunny') }} />
       <Tabs.Screen name="stories" options={{ title: 'Stories', tabBarIcon: icon('photo.on.rectangle', 'photo_library') }} />

@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { View, Text, ActivityIndicator, Platform } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
+import { Text } from '@/components/typography';
 import { Alert } from '@/lib/alert';
 import { router, useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';

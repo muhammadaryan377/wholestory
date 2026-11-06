@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Screen, H1, P, Btn } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { openHome } from '@/lib/navigation';
 
 /** Web OAuth redirect target. Native exchanges inside openAuthSessionAsync instead. */
 export default function OAuthCallback() {
@@ -24,7 +25,7 @@ export default function OAuthCallback() {
       if (error) throw error;
       if (!data.session) throw new Error('Could not establish a login session.');
       window.history.replaceState(null, '', window.location.pathname);
-      router.replace('/(tabs)');
+      openHome();
     };
     void complete().catch(error => setErrorText(error instanceof Error ? error.message : 'Sign-in failed.'));
   }, []);
@@ -32,14 +33,14 @@ export default function OAuthCallback() {
   useEffect(() => {
     // On native, the auth browser's own caller exchanges the code. Avoid trying
     // to consume a single-use PKCE code a second time in this route.
-    if (Platform.OS !== 'web' && session) router.replace('/(tabs)');
+    if (Platform.OS !== 'web' && session) openHome();
   }, [session]);
 
   return (
     <Screen>
       <H1>{errorText ? 'Sign-in unsuccessful' : 'Completing sign-in…'}</H1>
       <P>{errorText || 'Finishing your secure Apple or Google sign-in.'}</P>
-      {errorText ? <Btn title="Back to login" onPress={() => router.replace('/sign-in')} /> : null}
+      <Btn title="Back to login" kind="link" onPress={() => router.replace('/sign-in')} />
     </Screen>
   );
 }

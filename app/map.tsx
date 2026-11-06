@@ -1,11 +1,14 @@
+import { backOrReplace } from '@/lib/navigation';
 import { useFocusResource } from '@/lib/use-focus-resource';
 import { parseDate } from '@/lib/dates';
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Pressable, ScrollView, Platform } from 'react-native';
+import { Text } from '@/components/typography';
+import Constants from 'expo-constants';
 import { router, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker } from 'react-native-maps';
-import { Btn, Chip, Empty, Loading, LoadError, Small, Thread } from '@/components/ui';
+import { Btn, Chip, Empty, H1, Loading, LoadError, Screen, Small, Thread } from '@/components/ui';
 import { Photo } from '@/components/media';
 import { getStory, listStories, type Entry, type Story } from '@/lib/api';
 import { C, F, S } from '@/lib/theme';
@@ -44,7 +47,7 @@ export default function StoriesMap() {
   const header = (
     <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: 'rgba(248,243,232,0.96)', paddingHorizontal: S.pad, paddingBottom: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Back"><Text style={{ fontSize: 26, color: C.ink }}>‹</Text></Pressable>
+        <Pressable onPress={() => backOrReplace('/(tabs)/stories')} hitSlop={12} accessibilityLabel="Back"><Text style={{ fontSize: 26, color: C.ink }}>‹</Text></Pressable>
         <Text style={{ fontFamily: F.serif, fontSize: 26, color: C.navy }}>Stories</Text>
         <Thread width={90} />
       </View>
@@ -58,13 +61,17 @@ export default function StoriesMap() {
 
   if (error) return <LoadError error={error} onRetry={reload} />;
   if (!stories) return <Loading />;
+  // Android's native map cannot mount without a configured Google Maps key.
+  if (Platform.OS === 'android' && !Constants.expoConfig?.android?.config?.googleMaps?.apiKey) {
+    return <Screen><H1>Stories map</H1><Small>The map is not available in this build. You can still browse all your stories in the list.</Small><Btn title="View stories" onPress={() => router.replace('/(tabs)/stories')} /></Screen>;
+  }
   const placed = stories.filter(s => s.lat != null && s.lng != null);
   const unplaced = stories.length - placed.length;
   if (!placed.length) return (
     <View style={{ flex: 1, backgroundColor: C.cream }}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={{ flex: 1, justifyContent: 'center', padding: S.pad }}>
-        <Empty title="No places yet" body="Stories appear on the map when their photos have a location saved. Photos taken on your phone usually do." action="Back to stories" onAction={() => router.back()} />
+        <Empty title="No places yet" body="Stories appear on the map when their photos have a location saved. Photos taken on your phone usually do." action="Back to stories" onAction={() => backOrReplace('/(tabs)/stories')} />
       </View>
       {header}
     </View>

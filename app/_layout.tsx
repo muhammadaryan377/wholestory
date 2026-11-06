@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { Stack, router } from 'expo-router';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -16,6 +17,8 @@ import { clearMediaCache } from '@/lib/media';
 import { DialogHost } from '@/components/dialog-host';
 import { Loading } from '@/components/ui';
 import { ensureProfile } from '@/lib/api';
+import { BackButton } from '@/components/back-button';
+import { backOrReplace } from '@/lib/navigation';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -32,34 +35,37 @@ Sentry.init({
 });
 
 export { ErrorBoundary } from 'expo-router';
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function RootLayout() {
   const [loaded, error] = useFonts({ Newsreader_400Regular, Newsreader_600SemiBold, Newsreader_400Regular_Italic, Inter_400Regular, Inter_500Medium, Inter_600SemiBold });
   useEffect(() => { if (error) throw error; }, [error]);
-  useEffect(() => { if (loaded) SplashScreen.hideAsync(); }, [loaded]);
   if (!loaded) return null;
   return (
-    <AuthProvider>
-      <SessionEffects />
-      <DialogHost />
-      <StatusBar style="dark" />
-      <AppStack />
-    </AuthProvider>
+    <KeyboardProvider>
+      <AuthProvider>
+        <SessionEffects />
+        <DialogHost />
+        <StatusBar style="dark" />
+        <AppStack />
+      </AuthProvider>
+    </KeyboardProvider>
   );
 }
 
 function AppStack() {
   const { session, ready } = useAuth();
+  useEffect(() => { if (ready) void SplashScreen.hideAsync().catch(() => {}); }, [ready]);
   if (!ready) return <Loading />;
   return (
-      <Stack screenOptions={{ headerStyle: { backgroundColor: C.cream }, headerShadowVisible: false, headerTintColor: C.ink, headerTitleStyle: { fontFamily: F.serif, color: C.navy }, contentStyle: { backgroundColor: C.cream }, headerBackTitle: 'Back' }}>
+      <Stack screenOptions={{ headerStyle: { backgroundColor: C.cream }, headerShadowVisible: false, headerTintColor: C.ink, headerTitleStyle: { fontFamily: F.serif, color: C.navy }, contentStyle: { backgroundColor: C.cream }, headerBackTitle: 'Back', headerLeft: () => <BackButton onPress={() => backOrReplace(session ? '/(tabs)' : '/welcome')} /> }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="welcome" options={{ headerShown: false }} />
         <Stack.Screen name="sign-in" options={{ title: 'Log in' }} />
         <Stack.Screen name="sign-up" options={{ title: 'Create your account' }} />
         <Stack.Screen name="reset-password" options={{ title: 'Reset password' }} />
         <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
+        <Stack.Screen name="auth/confirm" options={{ headerShown: false }} />
         <Stack.Screen name="join/[code]" options={{ title: 'Join a story' }} />
         <Stack.Screen name="setup" options={{ headerShown: false }} />
         <Stack.Protected guard={!!session}>

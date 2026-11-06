@@ -1,5 +1,7 @@
+import { backOrReplace } from '@/lib/navigation';
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/components/typography';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,7 +30,7 @@ export default function PhotoViewer() {
     favouriteIds().then(ids => { if (active) setFav(ids.includes(p.id)); }).catch(() => {});
     return () => { active = false; };
   }, [p.path, p.id, unlocked, retry]);
-  if (error) return <Screen><P>{error}</P>{locked ? <Btn title="Open Private albums" onPress={() => router.replace('/private')} /> : <Btn title="Try again" onPress={() => setRetry(value => value + 1)} />}<Btn kind="link" title="Back" onPress={() => router.back()} /></Screen>;
+  if (error) return <Screen><P>{error}</P>{locked ? <Btn title="Open Private albums" onPress={() => router.replace('/private')} /> : <Btn title="Try again" onPress={() => setRetry(value => value + 1)} />}<Btn kind="link" title="Back" onPress={() => backOrReplace('/(tabs)/stories')} /></Screen>;
   const taken = p.taken ? new Date(p.taken) : null;
   const chip = (t: string) => <View style={{ backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5, marginRight: 6, marginBottom: 6 }}><Text style={{ color: '#fff', fontFamily: F.sans, fontSize: 13 }}>{t}</Text></View>;
   return (
@@ -36,7 +38,7 @@ export default function PhotoViewer() {
       <Stack.Screen options={{ headerShown: false }} />
       <Image source={uri ? { uri } : undefined} style={{ flex: 1, width }} contentFit="contain" />
       <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 }}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Close"><Text style={{ color: '#fff', fontSize: 30 }}>×</Text></Pressable>
+        <Pressable onPress={() => backOrReplace('/(tabs)/stories')} hitSlop={12} accessibilityLabel="Close"><Text style={{ color: '#fff', fontSize: 30 }}>×</Text></Pressable>
         <Pressable disabled={savingFavourite} onPress={async () => {
           if (savingFavourite) return;
           setSavingFavourite(true);

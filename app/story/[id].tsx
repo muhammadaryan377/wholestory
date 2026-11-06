@@ -1,6 +1,8 @@
 import { parseDate } from '@/lib/dates';
 import { useCallback, useState } from 'react';
-import { Share, View, Text, Pressable, ActionSheetIOS, Platform, Modal, ScrollView } from 'react-native';
+import { Share, View, Pressable, ActionSheetIOS, Platform, Modal } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { Text } from '@/components/typography';
 import { Alert } from '@/lib/alert';
 import { router, useFocusEffect, useLocalSearchParams, Stack } from 'expo-router';
 import * as Linking from 'expo-linking';
@@ -11,8 +13,10 @@ import { openPhoto } from '@/lib/open';
 import { addPerson, deleteEntry, deleteStory, getStory, inviteCode, listPeople, me, peopleInStory, setPeopleInStory, updateStory, type Entry, type Person, type Story } from '@/lib/api';
 import { C, F, S } from '@/lib/theme';
 import { PrivateLockedError, usePrivateUnlocked } from '@/lib/private-access';
+import { useMobileLayout } from '@/lib/use-mobile-layout';
 
 export default function StoryScreen() {
+  const { contentWidth, compact } = useMobileLayout();
   const [loadError, setLoadError] = useState('');
   const { id } = useLocalSearchParams<{ id: string }>();
   const unlocked = usePrivateUnlocked();
@@ -73,7 +77,7 @@ export default function StoryScreen() {
         <H1>{story.title}</H1>
         {tagged.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{people.filter(p => tagged.includes(p.id)).map(p => <Chip key={p.id} label={p.name} onPress={() => router.push(`/people/${p.id}`)} />)}</View> : null}
         <Small style={{ marginBottom: 12 }}>{story.private ? '🔒 Private · ' : ''}{entries.length} {entries.length === 1 ? 'moment' : 'moments'} · {parseDate(story.story_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}{story.hidden_from_memories ? ' · hidden from memories' : ''}</Small>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={{ flexDirection: compact ? 'column' : 'row', gap: 8 }}>
           <Btn title="Add to this story" onPress={() => router.push({ pathname: '/story/add/[id]', params: { id: story.id, title: story.title } })} style={{ flex: 1 }} />
           <Btn title="Tell it all" kind="outline" onPress={() => router.push({ pathname: '/story/tell', params: { id: story.id, title: story.title } })} style={{ flex: 0.7 }} />
           {owner && !story.private ? <Btn title="Invite" kind="outline" onPress={invite} style={{ flex: 0.6 }} /> : null}
@@ -97,7 +101,7 @@ export default function StoryScreen() {
             ) : null}
             {e.photos.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>{e.photos.map(p => (
               <Pressable key={p.id} onPress={() => openPhoto(p, story.id, story.title)} style={{ width: e.photos.length === 1 || p.caption ? '100%' : undefined }}>
-                <Photo path={p.path} size={e.photos.length === 1 || p.caption ? 300 : 96} />
+                <Photo path={p.path} size={e.photos.length === 1 || p.caption ? contentWidth - 30 : Math.floor((contentWidth - 42) / 3)} />
                 {p.caption ? <Text style={{ fontFamily: F.serifRegular, fontSize: 15, color: C.ink, marginTop: 4, marginBottom: 6 }}>{p.caption}</Text> : null}
               </Pressable>))}</View> : null}
             {e.text ? <Text style={{ fontFamily: F.serifRegular, fontSize: 17, color: C.ink, marginTop: 8, lineHeight: 24 }}>{e.text}</Text> : null}
@@ -107,14 +111,14 @@ export default function StoryScreen() {
         ))}
       </Screen>
       <Modal visible={tagging} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setTagging(false)}>
-        <ScrollView style={{ backgroundColor: C.cream }} contentContainerStyle={{ padding: S.pad }} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScrollView bottomOffset={24} style={{ backgroundColor: C.cream }} contentContainerStyle={{ padding: S.pad }} keyboardShouldPersistTaps="handled">
           <H1>Who’s in this story?</H1>
           <P muted style={{ marginBottom: 10 }}>Tap to add or remove. Each person’s page shows your stories together.</P>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{people.map(p => <Chip key={p.id} label={p.name} on={tagged.includes(p.id)} onPress={() => setTagged(tagged.includes(p.id) ? tagged.filter(x => x !== p.id) : [...tagged, p.id])} />)}</View>
           <Field label="Someone new" value={newName} onChangeText={setNewName} placeholder="Their name" />
           <Btn title="Add person" kind="outline" onPress={async () => { if (!newName.trim()) return; const pid = await addPerson(newName); setNewName(''); setPeople(await listPeople()); setTagged([...tagged, pid]); }} />
           <Btn title="Done" onPress={async () => { await setPeopleInStory(story.id, tagged); setTagging(false); load(); }} />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </Modal>
     </>
   );

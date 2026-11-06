@@ -24,6 +24,7 @@
       }
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
       "package": "app.wholestory.android",
       "adaptiveIcon": {
         "backgroundColor": "#12563E",
@@ -53,6 +54,15 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false
+          }
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
@@ -60,6 +70,12 @@
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
           "imageWidth": 240,
+          "android": {
+            "image": "./assets/images/icon.png",
+            "imageWidth": 160,
+            "backgroundColor": "#12563E",
+            "resizeMode": "contain"
+          },
           "backgroundColor": "#F8F3E8"
         }
       ],
@@ -113,13 +129,13 @@
       "typedRoutes": true
     },
     "extra": {
-      "eas": {
-        "projectId": "5266ca09-ed49-4a5f-b460-9cfa60c0787e"
-      },
       "router": {
         "asyncRoutes": {
           "web": true
         }
+      },
+      "eas": {
+        "projectId": "5266ca09-ed49-4a5f-b460-9cfa60c0787e"
       }
     },
     "owner": "aryan12m"

@@ -1,9 +1,17 @@
 {
   "cli": {
     "version": ">= 16.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "remote",
+    "promptToConfigurePushNotifications": false
   },
   "build": {
+    "android-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",
@@ -20,7 +28,14 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_PAYMENTS_ENABLED": "false"
+        "EXPO_PUBLIC_PAYMENTS_ENABLED": "false",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://vxzmaringxdxsnaavkit.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4em1hcmluZ3hkeHNuYWF2a2l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTUxMDUsImV4cCI6MjEwODg5MTEwNX0.xbkIIA_64AF-K6kDeeP_-spmI04vcImrt9FIVNAjZpQ",
+        "EXPO_PUBLIC_GUEST_PAGE_URL": "https://wholestory.app",
+        "EXPO_PUBLIC_PRIVACY_URL": "https://wholestory.app/privacy",
+        "EXPO_PUBLIC_TERMS_URL": "https://wholestory.app/terms",
+        "EXPO_PUBLIC_SUPPORT_EMAIL": "support@wholestory.app",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       },
       "environment": "production"
     },

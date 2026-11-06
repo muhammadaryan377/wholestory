@@ -1,6 +1,7 @@
 import { parseDate } from '@/lib/dates';
 import { useCallback, useState } from 'react';
-import { View, Text, Pressable, RefreshControl, ScrollView } from 'react-native';
+import { View, Pressable, RefreshControl, ScrollView } from 'react-native';
+import { Text } from '@/components/typography';
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, H1, H2, P, Small, Thread, Empty, Btn } from '@/components/ui';
@@ -11,11 +12,13 @@ import { getPrefs, scheduleLocal } from '@/lib/notify';
 import { handOff } from '@/lib/handoff';
 import { Image } from 'expo-image';
 import { C, F, S } from '@/lib/theme';
+import { useMobileLayout } from '@/lib/use-mobile-layout';
 
 const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
 const sameDayLastYears = (d: string) => { const t = new Date(); const x = parseDate(d); return x.getDate() === t.getDate() && x.getMonth() === t.getMonth() && x.getFullYear() < t.getFullYear(); };
 
 export default function Today() {
+  const { padding, pageWidth } = useMobileLayout();
   const [name, setName] = useState(''); const [stories, setStories] = useState<Story[] | null>(null); const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [allowed, setAllowed] = useState<boolean | null>(null); const [sugs, setSugs] = useState<Suggestion[]>([]); const [keep, setKeep] = useState<((s: Story) => boolean) | null>(null);
@@ -34,9 +37,9 @@ export default function Today() {
   const memories = (stories ?? []).filter(s => (keep ? keep(s) : !s.hidden_from_memories) && sameDayLastYears(s.story_date));
   const recent = (stories ?? []).slice(0, 6);
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.cream }} edges={['top']}>
-      <ScrollView contentContainerStyle={{ padding: S.pad, paddingBottom: 60 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.cream }} edges={['top', 'left', 'right']}>
+      <ScrollView contentContainerStyle={{ width: pageWidth, alignSelf: 'center', padding, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
           <Text style={{ fontFamily: F.serif, fontSize: 24, color: C.navy }}>Wholestory</Text><Thread width={110} />
         </View>
         <H1 style={{ marginTop: 6 }}>{greet()}{name ? `, ${name}` : ''}</H1>
@@ -49,7 +52,7 @@ export default function Today() {
         </Card>
 
         {allowed && sugs.length ? (<>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}><H2>Stories waiting to be told</H2><Pressable onPress={() => router.push('/suggestions')}><Text style={{ fontFamily: F.sansMedium, color: C.green }}>See all</Text></Pressable></View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between', alignItems: 'baseline' }}><H2>Stories waiting to be told</H2><Pressable onPress={() => router.push('/suggestions')}><Text style={{ fontFamily: F.sansMedium, color: C.green }}>See all</Text></Pressable></View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -S.pad, paddingLeft: S.pad, marginBottom: 12 }}>
             {sugs.slice(0, 5).map(s => (
               <Pressable key={s.id} onPress={() => tell(s)} style={{ width: 130, marginRight: 10 }}>

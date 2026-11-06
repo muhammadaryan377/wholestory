@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
-import { Share, View, Text, Pressable, Modal, ScrollView } from 'react-native';
+import { Share, View, Pressable, Modal, ScrollView } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { Text } from '@/components/typography';
 import { Alert } from '@/lib/alert';
 import { router, useFocusEffect, useLocalSearchParams, Stack } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -15,6 +17,7 @@ import { eventUrl } from '@/lib/media';
 import { exportEvent } from '@/lib/exporter';
 import { C, F, S } from '@/lib/theme';
 import { dateRange } from '@/lib/dates';
+import { useMobileLayout } from '@/lib/use-mobile-layout';
 
 const EXPIRY: { key: string; label: string; at: (ev: EventRow) => string | null }[] = [
   { key: 'never', label: 'Never', at: () => null },
@@ -23,6 +26,7 @@ const EXPIRY: { key: string; label: string; at: (ev: EventRow) => string | null 
 ];
 
 export default function EventScreen() {
+  const { contentWidth } = useMobileLayout();
   const [loadError, setLoadError] = useState('');
   const { id } = useLocalSearchParams<{ id: string }>();
   const [data, setData] = useState<{ ev: EventRow; moments: Moment[]; posts: Post[] } | null>(null);
@@ -74,7 +78,7 @@ export default function EventScreen() {
         <Small>{p.author_user ? 'You (host)' : p.guest_name || 'Guest'}{momentName(p.moment_id) ? ` · ${momentName(p.moment_id)}` : ''} · {new Date(p.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</Small>
         <Pressable onPress={() => remove(p)} hitSlop={10} accessibilityLabel="Remove"><Text style={{ color: C.faint }}>🗑</Text></Pressable>
       </View>
-      {p.photos.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>{p.photos.map(ph => <Photo key={ph.id} path={ph.path} event size={p.photos.length === 1 ? 300 : 96} />)}</View> : null}
+      {p.photos.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>{p.photos.map(ph => <Photo key={ph.id} path={ph.path} event size={p.photos.length === 1 ? contentWidth - 30 : Math.floor((contentWidth - 42) / 3)} />)}</View> : null}
       {p.text ? <Text style={{ fontFamily: F.serifRegular, fontSize: 16, color: C.ink, marginTop: 8 }}>{p.text}</Text> : null}
       {p.audio_path ? <VoicePlayer path={p.audio_path} event durationMs={p.duration_ms} /> : null}
       {!p.approved ? <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}><Btn title="Approve" onPress={async () => { await approvePost(p.id); load(); }} style={{ flex: 1 }} /><Btn title="Remove" kind="outline" onPress={() => remove(p)} style={{ flex: 1 }} /></View>
@@ -122,7 +126,7 @@ export default function EventScreen() {
       </Screen>
 
       <Modal visible={sheet === 'settings'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet('none')}>
-        <ScrollView style={{ backgroundColor: C.cream }} contentContainerStyle={{ padding: S.pad }}>
+        <KeyboardAwareScrollView bottomOffset={24} style={{ backgroundColor: C.cream }} contentContainerStyle={{ padding: S.pad }}>
           <H1>Event settings</H1>
           <ToggleRow title="Wall open" sub="Turn off to stop new photos and stories from you and guests" value={ev.is_open} onChange={v => set({ is_open: v })} />
           <ToggleRow title="Allow guest uploads" sub="Let guests add photos and stories" value={ev.allow_guest_uploads} onChange={v => set({ allow_guest_uploads: v })} />
@@ -147,10 +151,10 @@ export default function EventScreen() {
           <Btn title="Done" onPress={() => setSheet('none')} />
           <Btn title="Delete event wall" kind="outline" onPress={() => Alert.alert('Delete this event wall?', 'Everything guests added will be removed. This cannot be undone.', [
             { text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { setSheet('none'); await deleteEvent(ev.id); router.back(); } }])} />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </Modal>
       <Modal visible={sheet === 'add'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet('none')}>
-        <ScrollView style={{ backgroundColor: C.cream }} contentContainerStyle={{ padding: S.pad }} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScrollView bottomOffset={24} style={{ backgroundColor: C.cream }} contentContainerStyle={{ padding: S.pad }} keyboardShouldPersistTaps="handled">
           <H1>Add to {ev.name}</H1>
           <P muted style={{ marginBottom: 10 }}>Your photos and stories go straight onto the wall.</P>
           {moments.length ? (<><Small style={{ marginBottom: 6 }}>Which moment?</Small>
@@ -158,7 +162,7 @@ export default function EventScreen() {
           <Composer draft={draft} setDraft={setDraft} prompt="What do you want everyone to remember?" />
           <Btn title="Add to the wall" onPress={addPost} busy={busy} disabled={!!(draft.recording || draft.processingAudio)} />
           <Btn kind="link" title="Cancel" onPress={() => setSheet('none')} />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </Modal>
     </>
   );

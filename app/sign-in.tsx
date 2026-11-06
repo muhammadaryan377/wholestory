@@ -1,15 +1,28 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { Screen, H1, P, Btn, Field } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { SocialAuthButtons } from '@/components/social-auth-buttons';
 import { useAuth } from '@/lib/auth';
+import { EmailConfirmation } from '@/components/email-confirmation';
+import { BackButton } from '@/components/back-button';
+import { backOrReplace, openHome } from '@/lib/navigation';
+import { useHardwareBack } from '@/lib/use-hardware-back';
 
 export default function SignIn() {
   const { session } = useAuth();
   const [email, setEmail] = useState(''); const [pw, setPw] = useState(''); const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
+  const back = useCallback(() => {
+    if (busy) return true;
+    if (confirmationEmail) { setConfirmationEmail(null); setMessage(''); }
+    else backOrReplace('/welcome');
+    return true;
+  }, [busy, confirmationEmail]);
+  useHardwareBack(back);
+  const header = <Stack.Screen options={{ headerLeft: () => <BackButton onPress={back} disabled={busy} />, gestureEnabled: !busy && !confirmationEmail }} />;
   const go = async () => {
     if (busy) return;
     setMessage('');
@@ -21,10 +34,11 @@ export default function SignIn() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pw });
       if (error) {
+        if (error.code === 'email_not_confirmed') { setConfirmationEmail(email.trim()); return; }
         setMessage(error.message);
         return;
       }
-      router.replace('/(tabs)');
+      openHome();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not log in. Check your connection and try again.');
     } finally {
@@ -42,7 +56,9 @@ export default function SignIn() {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not send the reset email. Please try again.'); }
     finally { setBusy(false); }
   };
+  if (confirmationEmail) return <>{header}<EmailConfirmation email={confirmationEmail} onContinue={() => setConfirmationEmail(null)} onBack={() => { setConfirmationEmail(null); setEmail(''); setPw(''); setMessage(''); }} /></>;
   return (
+    <>{header}
     <Screen>
       <H1>Welcome back</H1>
       <P muted style={{ marginBottom: 16 }}>Log in to continue your stories.</P>
@@ -53,6 +69,6 @@ export default function SignIn() {
       <Btn kind="link" title="Forgot your password?" disabled={busy} onPress={reset} />
       {session?.user.is_anonymous ? <P muted style={{ marginTop: 12 }}>Signing in replaces this preview guest account. Guest stories are not transferred automatically.</P> : null}
       <SocialAuthButtons onError={setMessage} />
-    </Screen>
+    </Screen></>
   );
 }

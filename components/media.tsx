@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
+import { Text } from '@/components/typography';
 import { Alert } from '@/lib/alert';
 import * as Device from 'expo-device';
 import { Image } from 'expo-image';

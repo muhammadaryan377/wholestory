@@ -1,7 +1,8 @@
 import { useFocusResource } from '@/lib/use-focus-resource';
 import { dateRange } from '@/lib/dates';
 
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/components/typography';
 import { router } from 'expo-router';
 import { LoadError, Screen, H1, P, Card, Small, Empty, Btn, Loading } from '@/components/ui';
 import { listEvents } from '@/lib/api';

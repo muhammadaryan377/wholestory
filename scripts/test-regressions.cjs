@@ -21,6 +21,42 @@ function load(file, mocks = {}, globals = {}) {
   return module.exports;
 }
 
+test('setup Back follows visited steps, including skipped photo access, and stops at the first step', () => {
+  const { flowHistory } = load('lib/flow-history.ts');
+  let history = [0];
+  for (const step of [1, 3]) history = flowHistory(history, { type: 'next', step });
+  history = flowHistory(history, { type: 'back' });
+  assert.equal(history.at(-1), 1);
+  history = flowHistory(history, { type: 'next', step: 2 });
+  history = flowHistory(history, { type: 'next', step: 3 });
+  history = flowHistory(history, { type: 'back' });
+  assert.equal(history.at(-1), 2);
+  for (let i = 0; i < 5; i++) history = flowHistory(history, { type: 'back' });
+  assert.equal(history.length, 1);
+  assert.equal(history[0], 0);
+});
+
+test('Back has a destination without history; completed login cannot return to auth screens', () => {
+  let stack = ['/welcome', '/sign-up', '/sign-in'];
+  const router = {
+    canGoBack: () => stack.length > 1,
+    back: () => stack.pop(),
+    replace: route => { stack[stack.length - 1] = route; },
+    dismissAll: () => { stack = stack.slice(0, 1); },
+    push: route => stack.push(route),
+  };
+  const { backOrReplace, openHome } = load('lib/navigation.ts', { 'expo-router': { router } });
+  backOrReplace('/welcome');
+  assert.equal(stack.at(-1), '/sign-up');
+  openHome('/suggestions');
+  assert.deepEqual(stack, ['/(tabs)', '/suggestions']);
+  backOrReplace('/welcome');
+  assert.deepEqual(stack, ['/(tabs)']);
+  stack = ['/sign-in'];
+  backOrReplace('/welcome');
+  assert.deepEqual(stack, ['/welcome']);
+});
+
 function apiFixture(handler, upload = async () => 'uploaded.jpg') {
   const calls = [];
   const removed = [];

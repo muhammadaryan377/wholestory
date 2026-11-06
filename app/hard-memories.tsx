@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { Text } from '@/components/typography';
 import { Alert } from '@/lib/alert';
 import { useFocusEffect } from 'expo-router';
 import { LoadError, Screen, H1, H2, P, ToggleRow, Loading, Small, Field, Btn } from '@/components/ui';

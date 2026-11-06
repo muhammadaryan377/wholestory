@@ -1,6 +1,7 @@
 import { parseDate } from '@/lib/dates';
 import { useCallback, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { Text } from '@/components/typography';
 import { Alert } from '@/lib/alert';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { LoadError, Screen, H1, H2, P, Field, Btn, Small, Chip, Loading } from '@/components/ui';

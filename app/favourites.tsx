@@ -1,6 +1,7 @@
 import { useFocusResource } from '@/lib/use-focus-resource';
 
-import { Pressable, View, useWindowDimensions } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { useMobileLayout } from '@/lib/use-mobile-layout';
 
 import { LoadError, Screen, H1, P, Small, Empty, Loading } from '@/components/ui';
 import { Photo } from '@/components/media';
@@ -9,7 +10,7 @@ import { openPhoto } from '@/lib/open';
 
 export default function Favourites() {
   const { data: items, error, reload } = useFocusResource(listFavourites);
-  const { width } = useWindowDimensions(); const size = Math.floor((width - 40 - 12) / 3);
+  const { contentWidth } = useMobileLayout(); const size = Math.floor((contentWidth - 12) / 3);
 
   if (error) return <LoadError error={error} onRetry={reload} />;
   if (!items) return <Loading />;

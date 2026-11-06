@@ -1,6 +1,8 @@
 import { parseDate } from '@/lib/dates';
 import { useCallback, useState } from 'react';
-import { Text, View, Pressable, useWindowDimensions } from 'react-native';
+import { View, Pressable } from 'react-native';
+import { Text } from '@/components/typography';
+import { useMobileLayout } from '@/lib/use-mobile-layout';
 import { Alert } from '@/lib/alert';
 import { router, useFocusEffect, useLocalSearchParams, Stack } from 'expo-router';
 import { LoadError, Screen, H2, Small, Card, Empty, Loading, Btn, ToggleRow } from '@/components/ui';
@@ -13,7 +15,7 @@ export default function PersonPage() {
   const [loadError, setLoadError] = useState('');
   const { id } = useLocalSearchParams<{ id: string }>();
   const [data, setData] = useState<{ person: Person & { hidden_from_memories?: boolean }; stories: Story[]; photos: (StoredPhoto & { story_id: string })[] } | null>(null);
-  const { width } = useWindowDimensions(); const tile = Math.floor((width - S.pad * 2 - 12) / 3);
+  const { contentWidth, pageWidth: width } = useMobileLayout(); const tile = Math.floor((contentWidth - 12) / 3);
   const load = useCallback(async () => {
     try { setLoadError(''); const r = await getPerson(id); setData({ ...r, photos: await photosInStories(r.stories.map(s => s.id), 12) }); } catch (e) { setLoadError(e instanceof Error ? e.message : 'Could not load. Please try again.'); }
   }, [id]);

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Pressable, Text, TextInput } from 'react-native';
+import { View, Pressable, TextInput } from 'react-native';
+import { Text } from '@/components/typography';
 import { Alert } from '@/lib/alert';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';

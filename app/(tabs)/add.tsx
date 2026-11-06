@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { Screen, H1, P, Card, Small } from '@/components/ui';
-import { Text } from 'react-native';
+import {  } from 'react-native';
+import { Text } from '@/components/typography';
 import { C, F } from '@/lib/theme';
 
 const Option = ({ title, sub, onPress }: { title: string; sub: string; onPress: () => void }) => (

@@ -1,9 +1,12 @@
-import React, { useRef } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, ViewStyle, TextInputProps } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Pressable, StyleSheet, Switch, TextInput, View, ViewStyle, TextInputProps } from 'react-native';
+import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
+import { Text } from '@/components/typography';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { C, F, S } from '@/lib/theme';
 import { Alert } from '@/lib/alert';
+import { useMobileLayout } from '@/lib/use-mobile-layout';
 
 export function runAction(action?: () => unknown) {
   try {
@@ -20,11 +23,15 @@ export function Thread({ width = 120 }: { width?: number }) {
     </Svg>
   );
 }
-export function Screen({ children, scroll = true, style }: { children: React.ReactNode; scroll?: boolean; style?: ViewStyle }) {
+export function Screen({ children, scroll = true, style, resetKey }: { children: React.ReactNode; scroll?: boolean; style?: ViewStyle; resetKey?: string | number }) {
+  const scrollRef = useRef<KeyboardAwareScrollViewRef>(null);
+  useEffect(() => { scrollRef.current?.scrollTo({ y: 0, animated: false }); }, [resetKey]);
+  const { padding } = useMobileLayout();
+  const contentStyle: ViewStyle = { width: '100%', maxWidth: 680, alignSelf: 'center', padding, paddingBottom: 32, flexGrow: 1 };
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.cream }} edges={['top']}>
-      {scroll ? <ScrollView contentContainerStyle={[{ padding: S.pad, paddingBottom: 60 }, style]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
-        : <View style={[{ flex: 1, padding: S.pad }, style]}>{children}</View>}
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.cream }} edges={['top', 'left', 'right', 'bottom']}>
+      {scroll ? <KeyboardAwareScrollView ref={scrollRef} bottomOffset={24} contentContainerStyle={[contentStyle, style]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">{children}</KeyboardAwareScrollView>
+        : <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding"><View style={[contentStyle, { flex: 1 }, style]}>{children}</View></KeyboardAvoidingView>}
     </SafeAreaView>
   );
 }
@@ -85,7 +92,12 @@ export function Empty({ title, body, action, onAction, secondary, onSecondary }:
     </View>
   );
 }
-export const Loading = () => <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.cream }}><ActivityIndicator color={C.green} /></View>;
+export function BrandLogo() {
+  const { contentWidth } = useMobileLayout();
+  const width = Math.min(contentWidth, 280);
+  return <Image source={require('../assets/images/splash-icon.png')} resizeMode="contain" accessibilityLabel="Wholestory" style={{ width, height: width / 3 }} />;
+}
+export const Loading = () => <View style={{ flex: 1, gap: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: C.cream }}><BrandLogo /><ActivityIndicator color={C.green} accessibilityLabel="Loading" /></View>;
 export function LoadError({ error, onRetry }: { error: string; onRetry: () => void }) {
   return <Screen><H1>Could not load</H1><P accessibilityRole="alert">{error}</P><Btn title="Try again" onPress={onRetry} /></Screen>;
 }
@@ -97,12 +109,12 @@ export const st = StyleSheet.create({
   small: { fontFamily: F.sans, fontSize: 12.5, color: C.grey, lineHeight: 17 },
   btn: { backgroundColor: C.green, borderRadius: 28, paddingVertical: 15, paddingHorizontal: 20, alignItems: 'center', marginVertical: 6 },
   btnOutline: { backgroundColor: C.card, borderWidth: 1, borderColor: '#D8D2C6' },
-  btnText: { fontFamily: F.serif, fontSize: 17, color: C.white },
-  link: { paddingVertical: 10, alignItems: 'center' },
-  linkText: { fontFamily: F.sansMedium, fontSize: 14, color: C.green, textDecorationLine: 'underline' },
+  btnText: { fontFamily: F.serif, fontSize: 17, color: C.white, textAlign: 'center', flexShrink: 1 },
+  link: { minHeight: 48, paddingVertical: 12, justifyContent: 'center', alignItems: 'center' },
+  linkText: { fontFamily: F.sansMedium, fontSize: 14, color: C.green, textDecorationLine: 'underline', textAlign: 'center' },
   card: { backgroundColor: C.card, borderRadius: S.radius, borderWidth: 1, borderColor: C.line, padding: 14, marginBottom: S.gap },
   label: { fontFamily: F.sansBold, fontSize: 13, color: C.ink, marginBottom: 6 },
-  input: { backgroundColor: C.card, borderWidth: 1, borderColor: '#E0D9CD', borderRadius: 14, padding: 12, fontFamily: F.sans, fontSize: 15, color: C.ink },
+  input: { minHeight: 48, backgroundColor: C.card, borderWidth: 1, borderColor: '#E0D9CD', borderRadius: 14, padding: 12, fontFamily: F.sans, fontSize: 16, color: C.ink },
   row: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.line, borderRadius: 14, padding: 14, marginBottom: 8 },
   rowTitle: { fontFamily: F.sansBold, fontSize: 15, color: C.ink },
   chip: { borderWidth: 1, borderColor: '#D8D2C6', backgroundColor: C.card, borderRadius: 18, paddingVertical: 7, paddingHorizontal: 13, marginRight: 8, marginBottom: 8 },

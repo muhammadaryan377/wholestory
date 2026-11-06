@@ -1,6 +1,7 @@
 import { useFocusResource } from '@/lib/use-focus-resource';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/components/typography';
 import { Alert } from '@/lib/alert';
 import { router } from 'expo-router';
 import { LoadError, Screen, H1, P, Card, Small, Empty, Field, Btn, Loading } from '@/components/ui';
