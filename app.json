@@ -21,7 +21,8 @@
         "NSFaceIDUsageDescription": "Wholestory uses Face ID to open your private albums.",
         "NSSpeechRecognitionUsageDescription": "Wholestory turns your voice stories into words on your phone, so you can read and search them.",
         "NSPhotoLibraryAddUsageDescription": "Wholestory can save photos from your stories to your library."
-      }
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "app.wholestory.android",
@@ -107,7 +108,8 @@
         }
       ],
       "@sentry/react-native/expo",
-      "expo-asset"
+      "expo-asset",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true
