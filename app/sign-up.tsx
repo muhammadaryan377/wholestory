@@ -36,7 +36,6 @@ export default function SignUp() {
       <Field label="Your first name" value={name} onChangeText={setName} placeholder="e.g. Sam" autoComplete="given-name" />
       <Field label="Email address" value={email} onChangeText={setEmail} placeholder="you@example.com" autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
       <Field label="Create a password" value={pw} onChangeText={setPw} placeholder="At least 8 characters" secureTextEntry autoComplete="new-password" />
-      <Small style={{ marginBottom: 10 }}>Your memories are private unless you choose to share them. By continuing you agree to the Terms and Privacy Policy.</Small>
       <Btn title="Create account" onPress={go} busy={busy} />
       <SocialAuthButtons onError={setMessage} />
       {message ? <P accessibilityRole="alert">{message}</P> : null}
