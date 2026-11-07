@@ -53,7 +53,7 @@ function IntroPhotoCards() {
     {art.map((a, i) =>
       <View key={a.label} style={[styles.artCard, { backgroundColor: a.bg, marginTop: i === 1 ? 0 : 23, transform: [{ rotate: i === 0 ? '-6deg' : i === 2 ? '6deg' : '0deg' }] }]}>
         <Text style={{ fontSize: 43 }}>{a.emoji}</Text>
-        <Image source={{ uri: a.uri }} style={{ ...StyleSheet.absoluteFillObject, borderRadius: 13 }} contentFit="cover" transition={150} />
+        <Image source={{ uri: a.uri }} style={{ ...StyleSheet.absoluteFill, borderRadius: 13 }} contentFit="cover" transition={150} />
       </View>)}
   </View>;
 }
@@ -379,11 +379,11 @@ export default function Onboarding() {
           <View style={styles.planArt}>
             <View style={[styles.planPhoto, { backgroundColor: '#E5EEDC', transform: [{ rotate: '-5deg' }] }]}>
               <Text style={{ fontSize: 43 }}>🌄</Text>
-              <Image source={{ uri: SAMPLE_PHOTOS.travel }} style={{ ...StyleSheet.absoluteFillObject, borderRadius: 12 }} contentFit="cover" transition={150} />
+              <Image source={{ uri: SAMPLE_PHOTOS.travel }} style={{ ...StyleSheet.absoluteFill, borderRadius: 12 }} contentFit="cover" transition={150} />
             </View>
             <View style={[styles.planPhoto, { backgroundColor: '#F3E0D2', transform: [{ rotate: '6deg' }] }]}>
               <Text style={{ fontSize: 43 }}>💛</Text>
-              <Image source={{ uri: SAMPLE_PHOTOS.people }} style={{ ...StyleSheet.absoluteFillObject, borderRadius: 12 }} contentFit="cover" transition={150} />
+              <Image source={{ uri: SAMPLE_PHOTOS.people }} style={{ ...StyleSheet.absoluteFill, borderRadius: 12 }} contentFit="cover" transition={150} />
             </View>
           </View>
           {PAYMENTS_ENABLED ? <>
