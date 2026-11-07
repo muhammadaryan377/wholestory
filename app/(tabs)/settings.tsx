@@ -40,7 +40,7 @@ export default function Settings() {
       <Small style={{ marginBottom: 8 }}>{email}</Small>
       <Btn title="Save" kind="outline" onPress={save} busy={busy} />
       {session?.user.is_anonymous ? <>
-        <Small style={{ marginBottom: 8 }}>You're in preview guest mode. Sign in with Apple, Google, or email to use an existing account. Guest stories are not transferred.</Small>
+        <Small style={{ marginBottom: 8 }}>You&apos;re in preview guest mode. Sign in with Apple, Google, or email to use an existing account. Guest stories are not transferred.</Small>
         <NavRow title="Sign in or create an account" sub="Apple, Google, or email" onPress={() => router.push('/sign-in')} />
       </> : null}
       <H2 style={{ marginTop: 14 }}>Your stories</H2>
