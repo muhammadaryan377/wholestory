@@ -39,7 +39,7 @@ export default function Favourites() {
       {FILTERS.map(value => <Chip key={value} label={value} on={filter === value} onPress={() => setFilter(value)} />)}
     </ScrollView>
     {filter === 'Voice notes' ? <View style={styles.empty}><Text style={styles.heading}>Voice note favourites</Text>
-      <Small>Voice notes can be played inside stories. Saving individual voice notes to Favourites isn't available yet.</Small>
+      <Small>Voice notes can be played inside stories. Saving individual voice notes to Favourites isn’t available yet.</Small>
     </View> : null}
     {filter !== 'Voice notes' && !items.length ? <Empty title="No favourites yet" body="Open a story photo and tap the heart to save it here." /> : null}
     {filter !== 'Voice notes' && items.length > 0 && !selected.length ? <View style={styles.empty}>
