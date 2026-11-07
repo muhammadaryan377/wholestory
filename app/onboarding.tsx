@@ -9,7 +9,7 @@ import { Alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { myName, saveName, saveProfileChoices } from '@/lib/api';
 import { findSuggestions, libraryAllowed, countPhotos, type Suggestion } from '@/lib/suggest';
-import { saveNamedMoments, markSetupComplete, type NamedMoment } from '@/lib/moment-groups';
+import { saveNamedMoments, markSetupComplete } from '@/lib/moment-groups';
 import { chooseLocalProfilePhoto, readLocalProfilePhoto } from '@/lib/profile-photo';
 import { getPrefs, setPrefs } from '@/lib/notify';
 import { buy, configurePayments, getPackages, restore, PAYMENTS_ENABLED } from '@/lib/payments';
@@ -80,6 +80,7 @@ export default function Onboarding() {
   const [picked, setPicked] = useState<string[]>(['Family']);
   const [morning, setMorning] = useState(true);
   const [totalPhotos, setTotalPhotos] = useState<number | null>(null);
+  const [photoAccess, setPhotoAccess] = useState(false);
   const [groups, setGroups] = useState<MomentGroup[]>([]);
   const [editor, setEditor] = useState<Editing | null>(null);
   const [gallery, setGallery] = useState<ML.Asset[]>([]);
@@ -107,9 +108,10 @@ export default function Onboarding() {
     setPackageBusy(true);
     configurePayments(userId).then(getPackages).then(list => {
       if (!alive) return;
-      setPackages(list.filter(p => p.packageType === 'ANNUAL' || p.packageType === 'MONTHLY'));
-      const year = list.findIndex(p => p.packageType === 'ANNUAL');
-      if (year >= 0) setPackageIndex(0);
+      const available = list.filter(p => p.packageType === 'ANNUAL' || p.packageType === 'MONTHLY');
+      setPackages(available);
+      const year = available.findIndex(p => p.packageType === 'ANNUAL');
+      setPackageIndex(year >= 0 ? year : 0);
     }).catch(reason => { if (alive) setPackageError(reason instanceof Error ? reason.message : 'Unable to load plans.'); })
       .finally(() => { if (alive) setPackageBusy(false); });
     return () => { alive = false; };
@@ -178,7 +180,8 @@ export default function Onboarding() {
       if (!allowed) return Alert.alert('Photo access not allowed', 'You can continue without photos or allow access later in Settings.');
       const [count, suggestions] = await Promise.all([countPhotos(), findSuggestions(30)]);
       setTotalPhotos(count);
-      setGroups(suggestions.map((s: Suggestion) => ({ id: s.id, title: s.title, assets: s.assets })));
+      setPhotoAccess(true);
+      setGroups(suggestions.map((s: Suggestion) => ({ id: s.id.startsWith('named-') ? s.id.slice(6) : s.id, title: s.title, assets: s.assets })));
       setStep(2);
       void loadGallery(true);
     } catch (reason) {
@@ -255,7 +258,7 @@ export default function Onboarding() {
       <View style={styles.header}>
         <Pressable accessibilityRole="button" accessibilityLabel="Back"
           disabled={busy || (step === 0 && !editor)}
-          onPress={() => editor ? setEditor(null) : setStep(previous => Math.max(0, previous - 1))}
+          onPress={() => editor ? setEditor(null) : setStep(previous => previous === 3 && !photoAccess ? 1 : Math.max(0, previous - 1))}
           style={[styles.back, (step === 0 && !editor) && { opacity: 0 }]}>
           <Text style={{ fontSize: 26, color: C.green }}>‹</Text>
         </Pressable>
