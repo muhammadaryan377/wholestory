@@ -11,6 +11,8 @@ import { openPhoto } from '@/lib/open';
 import { addPerson, deleteEntry, deleteStory, getStory, inviteCode, listPeople, me, peopleInStory, setPeopleInStory, updateStory, type Entry, type Person, type Story } from '@/lib/api';
 import { C, F, S } from '@/lib/theme';
 import { PrivateLockedError, usePrivateUnlocked } from '@/lib/private-access';
+import { StoryLocationPicker } from '@/components/story-location';
+import { getStoryPreferences, saveStoryPreference, clearStoryLocation, type StoryLocation } from '@/lib/story-preferences';
 
 export default function StoryScreen() {
   const [loadError, setLoadError] = useState('');
@@ -18,12 +20,22 @@ export default function StoryScreen() {
   const unlocked = usePrivateUnlocked();
   const [data, setData] = useState<{ story: Story; entries: Entry[] } | null>(null);
   const [uid, setUid] = useState<string | null>(null);
+  const [storyPlace, setStoryPlace] = useState<StoryLocation | null>(null);
+  const [editPlace, setEditPlace] = useState(false);
   const [people, setPeople] = useState<Person[]>([]); const [tagged, setTagged] = useState<string[]>([]); const [tagging, setTagging] = useState(false); const [newName, setNewName] = useState('');
   const [confirmingEntryId, setConfirmingEntryId] = useState<string | null>(null);
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
   const [entryDeleteError, setEntryDeleteError] = useState<string | null>(null);
   const load = useCallback(async () => {
-    try { setLoadError(''); setData(await getStory(id)); setUid((await me())?.id ?? null); setPeople(await listPeople()); setTagged(await peopleInStory(id)); }
+    try { setLoadError(''); setData(await getStory(id));
+      const user = await me();
+      setUid(user?.id ?? null);
+      if (user) {
+        const pref = await getStoryPreferences(user.id);
+        setStoryPlace(pref[id]?.location ?? null);
+      }
+      setPeople(await listPeople());
+      setTagged(await peopleInStory(id)); }
     catch (e) { if (e instanceof PrivateLockedError) router.replace('/private'); else setLoadError(e instanceof Error ? e.message : 'Could not load this story.'); }
   }, [id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -41,6 +53,16 @@ export default function StoryScreen() {
     const code = await inviteCode(story.id);
     await copyStoryInvite(code);
     Alert.alert('Link copied', 'You can paste this invitation into any messaging app.');
+  };
+  const updatePlace = async (next: StoryLocation | null) => {
+    if (!uid || !data || data.story.private) return;
+    try {
+      if (next) await saveStoryPreference(uid, data.story.id, { location: next });
+      else await clearStoryLocation(uid, data.story.id);
+      setStoryPlace(next);
+    } catch (error) {
+      Alert.alert('Could not save location', error instanceof Error ? error.message : 'Try again.');
+    }
   };
   const options = () => {
     const items = ['Who’s in this story?', story.hidden_from_memories ? 'Show in memories again' : 'Hide from memories', story.private ? 'Move out of Private' : 'Move to Private', 'Rename', 'Delete story', 'Cancel'];
@@ -77,6 +99,13 @@ export default function StoryScreen() {
         <H1>{story.title}</H1>
         {tagged.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{people.filter(p => tagged.includes(p.id)).map(p => <Chip key={p.id} label={p.name} onPress={() => router.push(`/people/${p.id}`)} />)}</View> : null}
         <Small style={{ marginBottom: 12 }}>{story.private ? '🔒 Private · ' : ''}{entries.length} {entries.length === 1 ? 'moment' : 'moments'} · {parseDate(story.story_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}{story.hidden_from_memories ? ' · hidden from memories' : ''}</Small>
+        {owner && !story.private ? <>
+          <Pressable accessibilityRole="button" onPress={() => setEditPlace(v => !v)} style={{ alignSelf: 'flex-start', paddingVertical: 6 }}>
+            <Text style={{ color: C.green, fontFamily: F.sansMedium, fontSize: 13 }}>{storyPlace ? '⌖ Edit story location' : '⌖ Add story location (optional)'}</Text>
+          </Pressable>
+          {editPlace ? <StoryLocationPicker value={storyPlace} onChange={place => runAction(() => updatePlace(place))} /> : null}
+        </> : null}
+
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Btn title="Add to this story" onPress={() => router.push({ pathname: '/story/add/[id]', params: { id: story.id, title: story.title } })} style={{ flex: 1 }} />
           <Btn title="Tell it all" kind="outline" onPress={() => router.push({ pathname: '/story/tell', params: { id: story.id, title: story.title } })} style={{ flex: 0.7 }} />
