@@ -23,3 +23,5 @@ jobs:
         run: npm run lint
       - name: Existing regression tests
         run: node scripts/test-regressions.cjs
+      - name: Bundle Expo web with approved local artwork
+        run: npx expo export --platform web --output-dir /tmp/whole-stories-web

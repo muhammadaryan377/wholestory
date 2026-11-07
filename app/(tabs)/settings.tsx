@@ -96,6 +96,7 @@ export default function Settings() {
       <NavRow title="Privacy Policy" onPress={() => Linking.openURL(PRIVACY_URL)} />
       <NavRow title="Terms of Use" onPress={() => Linking.openURL(TERMS_URL)} />
       <H2 style={{ marginTop: 14 }}>Help</H2>
+      <NavRow title="View introduction" sub="Replay the five photo-led welcome screens" onPress={() => router.push('/welcome')} />
       <NavRow title="Contact us or send feedback" sub={SUPPORT} onPress={() => Linking.openURL(`mailto:${SUPPORT}?subject=Whole Stories%20test%20feedback`)} />
       <Btn title="Log out" kind="outline" onPress={async () => {
         await savePushToken(null).catch(() => {});

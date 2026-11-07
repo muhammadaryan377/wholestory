@@ -292,3 +292,28 @@ test('iOS presentation uses the approved Whole Stories name and packaged fonts',
   const locationPlugin = app.expo.plugins.find(p => Array.isArray(p) && p[0] === 'expo-location');
   assert.equal(locationPlugin[1].isIosBackgroundLocationEnabled, false);
 });
+
+test('reference photography is bundled locally and used in each intended app stage', () => {
+  const root = path.join(__dirname, '..');
+  const welcome = fs.readFileSync(path.join(root, 'app/welcome.tsx'), 'utf8');
+  const onboarding = fs.readFileSync(path.join(root, 'app/onboarding.tsx'), 'utf8');
+  const home = fs.readFileSync(path.join(root, 'app/(tabs)/index.tsx'), 'utf8');
+  const settings = fs.readFileSync(path.join(root, 'app/(tabs)/settings.tsx'), 'utf8');
+  for (const filename of ['couple.jpg', 'dog.jpg', 'timeline.jpg', 'voice.jpg', 'community.jpg', 'photo-collage.jpg', 'plan-collage.jpg']) {
+    const asset = path.join(root, 'assets/onboarding', filename);
+    assert.equal(fs.existsSync(asset), true, filename + ' missing');
+    assert.ok(fs.statSync(asset).size > 1500, filename + ' is unexpectedly small');
+  }
+  for (const filename of ['hero_couple_clean.png', 'photo_dog.jpg', 'photo_voice.jpg', 'timeline_greece.jpg', 'timeline_dinner.jpg', 'timeline_engagement.jpg', 'collab_friends.jpg', 'collab_mountains.jpg', 'collab_outdoors.jpg', 'collab_dinner.jpg', 'splash_glow_background.jpg']) {
+    assert.ok(welcome.includes('onboarding/' + filename), 'welcome not using ' + filename);
+    const bytes = fs.readFileSync(path.join(root, 'assets/onboarding', filename));
+    assert.ok(bytes.length > 1500, filename + ' is unexpectedly small');
+    assert.equal(bytes.subarray(0, 2).toString('hex'), filename.endsWith('.png') ? '8950' : 'ffd8', filename + ' is not a valid image format');
+  }
+  assert.ok(onboarding.includes('onboarding/photo-collage.jpg'));
+  assert.ok(onboarding.includes('onboarding/plan-collage.jpg'));
+  assert.ok(home.includes('onboarding/couple.jpg'));
+  assert.ok(settings.includes('Replay the five photo-led welcome screens'));
+  assert.ok(!welcome.includes('images.unsplash.com'));
+  assert.ok(!onboarding.includes('images.unsplash.com'));
+});

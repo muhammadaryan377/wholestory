@@ -36,26 +36,13 @@ function Progress({ active }: { active: number }) {
   </View>;
 }
 
-const SAMPLE_PHOTOS = {
-  travel: 'https://images.unsplash.com/photo-1533105079780-92b9be482077?w=500&q=75',
-  memory: 'https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?w=500&q=75',
-  people: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=500&q=75',
-};
+// Approved local collage from the onboarding reference artwork (not the user's photos).
 function IntroPhotoCards() {
-  // Optional sample photography. Each card has an offline fallback, and
-  // actual moment thumbnails always come from the user's photo library.
-  const art = [
-    { emoji: '🏖️', label: 'Travel', bg: '#DFEAE2', uri: SAMPLE_PHOTOS.travel },
-    { emoji: '☀️', label: 'Memories', bg: '#F8E3D5', uri: SAMPLE_PHOTOS.memory },
-    { emoji: '👨‍👩‍👧', label: 'People', bg: '#E5E9EF', uri: SAMPLE_PHOTOS.people },
-  ];
-  return <View style={styles.photoCards} accessibilityLabel="Sample photographs for stories">
-    {art.map((a, i) =>
-      <View key={a.label} style={[styles.artCard, { backgroundColor: a.bg, marginTop: i === 1 ? 0 : 23, transform: [{ rotate: i === 0 ? '-6deg' : i === 2 ? '6deg' : '0deg' }] }]}>
-        <Text style={{ fontSize: 43 }}>{a.emoji}</Text>
-        <Image source={{ uri: a.uri }} style={{ ...StyleSheet.absoluteFill, borderRadius: 13 }} contentFit="cover" transition={150} />
-      </View>)}
-  </View>;
+  return (
+    <View style={styles.photoCards} accessibilityLabel="Sample memories showing travel, friends and family">
+      <Image source={require('../assets/onboarding/photo-collage.jpg')} style={styles.photoCollage} contentFit="contain" />
+    </View>
+  );
 }
 
 function GroupCard({ group, onEdit }: { group: MomentGroup; onEdit: () => void }) {
@@ -376,17 +363,10 @@ export default function Onboarding() {
         {step === 3 ? <>
           <Text style={styles.heading}>Keep every story growing</Text>
           <Text style={styles.paragraph}>{PAYMENTS_ENABLED ? 'Choose the plan that works for your stories.' : 'You’re all set. Subscription purchases are disabled in this test build.'}</Text>
-          <View style={styles.planArt}>
-            <View style={[styles.planPhoto, { backgroundColor: '#E5EEDC', transform: [{ rotate: '-5deg' }] }]}>
-              <Text style={{ fontSize: 43 }}>🌄</Text>
-              <Image source={{ uri: SAMPLE_PHOTOS.travel }} style={{ ...StyleSheet.absoluteFill, borderRadius: 12 }} contentFit="cover" transition={150} />
-            </View>
-            <View style={[styles.planPhoto, { backgroundColor: '#F3E0D2', transform: [{ rotate: '6deg' }] }]}>
-              <Text style={{ fontSize: 43 }}>💛</Text>
-              <Image source={{ uri: SAMPLE_PHOTOS.people }} style={{ ...StyleSheet.absoluteFill, borderRadius: 12 }} contentFit="cover" transition={150} />
-            </View>
-          </View>
-          {PAYMENTS_ENABLED ? <>
+          <View style={styles.planArt} accessibilityLabel="Illustration of shared memories in two photos">
+             <Image source={require('../assets/onboarding/plan-collage.jpg')} style={styles.planCollage} contentFit="contain" />
+           </View>
+           {PAYMENTS_ENABLED ? <>
             {packageBusy ? <ActivityIndicator color={C.green} /> : null}
             {packageError ? <Text accessibilityRole="alert" style={styles.error}>{packageError}</Text> : null}
             {packages.map((pkg, i) => <Pressable key={pkg.identifier} accessibilityRole="radio"
@@ -456,8 +436,8 @@ const styles = StyleSheet.create({
   cameraBadge: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.green, position: 'absolute', right: -4, bottom: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.cream },
   note: { textAlign: 'center', color: C.grey, fontFamily: F.sans, fontSize: 11.5, lineHeight: 17, marginTop: 8 },
   footer: { borderTopWidth: 1, borderColor: '#E6E1D8', paddingHorizontal: 22, paddingBottom: 4, paddingTop: 7, backgroundColor: C.cream },
-  photoCards: { height: 220, flexDirection: 'row', marginVertical: 8, gap: 7, alignItems: 'center', justifyContent: 'center' },
-  artCard: { flex: 1, height: 155, borderRadius: 17, borderColor: C.white, borderWidth: 4, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  photoCards: { height: 205, flexDirection: 'row', marginVertical: 8, alignItems: 'center', justifyContent: 'center' },
+  photoCollage: { width: '100%', maxWidth: 430, height: 200 },
   benefit: { flexDirection: 'row', alignItems: 'center', gap: 14, marginVertical: 10 },
   benefitIcon: { width: 46, height: 46, borderRadius: 23, overflow: 'hidden', textAlign: 'center', textAlignVertical: 'center', backgroundColor: C.greenSoft, color: C.green, fontSize: 25 },
   benefitTitle: { color: C.navy, fontFamily: F.serif, fontSize: 19, marginBottom: 3 },
@@ -471,8 +451,8 @@ const styles = StyleSheet.create({
   galleryHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 18 },
   galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'space-between' },
   selectionBadge: { position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  planArt: { height: 130, flexDirection: 'row', justifyContent: 'center', marginTop: 4, marginBottom: 10, gap: 12 },
-  planPhoto: { width: '42%', height: 119, borderRadius: 16, borderWidth: 4, borderColor: '#FFF', alignItems: 'center', justifyContent: 'center' },
+  planArt: { height: 135, flexDirection: 'row', justifyContent: 'center', marginTop: 4, marginBottom: 10 },
+  planCollage: { width: '100%', maxWidth: 430, height: 130 },
   planCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderColor: C.line, borderWidth: 1.5, backgroundColor: C.card, padding: 15, marginVertical: 6 },
   planCardSelected: { borderColor: C.green, backgroundColor: C.greenSoft },
   planPrice: { fontFamily: F.serif, color: C.green, fontSize: 21 },

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { C as theme, F } from '@/lib/theme';
 import { useIntroVoice } from '@/lib/intro-voice';
+import { useAuth } from '@/lib/auth';
 
 const INTRO_SEEN_KEY = 'ws_intro_seen_v1';
 // The introduction follows the supplied artwork without changing the app-wide palette.
@@ -157,6 +158,8 @@ function Page({ i, width, height, scrollX, children }: { i: number; width: numbe
 }
 
 export default function Welcome() {
+  const { session } = useAuth();
+  const signedIn = !!session && !session.user.is_anonymous;
   const { width: windowWidth } = useWindowDimensions();
   const width = Math.min(windowWidth, 480);
   const insets = useSafeAreaInsets();
@@ -230,12 +233,12 @@ export default function Welcome() {
     setNavigating(true);
     try {
       await AsyncStorage.setItem(INTRO_SEEN_KEY, '1');
-      router.replace(destination);
+      router.replace(signedIn ? '/(tabs)' : destination);
     } catch {
       finishing.current = false;
       setNavigating(false);
     }
-  }, []);
+  }, [signedIn]);
 
   const onMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     programmatic.current = false;
@@ -248,7 +251,7 @@ export default function Welcome() {
   };
 
   const voiceIdle = index === VOICE_PAGE && voice.phase === 'idle';
-  const label = index === TOTAL - 1 ? 'Get started' : index === 0 ? 'Begin your story' : voiceIdle ? 'Try it' : 'Next';
+  const label = index === TOTAL - 1 ? (signedIn ? 'Back to Home' : 'Get started') : index === 0 ? 'Begin your story' : voiceIdle ? 'Try it' : 'Next';
   const showArrow = !(index === 0 || voiceIdle);
   const onAction = () => {
     if (voiceIdle) void voice.start();
@@ -409,7 +412,7 @@ export default function Welcome() {
         <Action label={label} arrow={showArrow} onPress={onAction} disabled={navigating} />
         <Animated.View style={{ opacity: loginOpacity, height: index === 0 ? 28 : 0, overflow: 'hidden' }} pointerEvents={index === 0 ? 'auto' : 'none'}>
           <Pressable accessibilityRole="button" disabled={navigating || index !== 0} onPress={() => void finish('/sign-in')} style={{ alignItems: 'center', paddingVertical: 5 }}>
-            <Text style={styles.loginText}>Already have an account? <Text style={styles.loginLink}>Log in</Text></Text>
+            <Text style={styles.loginText}>{signedIn ? 'Return to your stories. ' : 'Already have an account? '}<Text style={styles.loginLink}>{signedIn ? 'Home' : 'Log in'}</Text></Text>
           </Pressable>
         </Animated.View>
         {index > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => go(index - 1)} disabled={navigating} hitSlop={8} style={{ alignSelf: 'center', paddingVertical: 3 }}><Text style={styles.back}>Back</Text></Pressable> : null}
