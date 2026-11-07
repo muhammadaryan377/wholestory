@@ -3,7 +3,7 @@ import { parseDate } from '@/lib/dates';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { LoadError, Screen, H1, Field, Small, Empty, Loading, Chip, runAction } from '@/components/ui';
+import { LoadError, Screen, H1, Field, Small, Empty, Loading, Chip } from '@/components/ui';
 import { Photo } from '@/components/media';
 import { STORY_CATEGORIES, listStoriesWithPreferences, saveStoryPreference, type StoryCategory, type StoryWithPreference } from '@/lib/story-preferences';
 import { useAuth } from '@/lib/auth';
@@ -90,7 +90,7 @@ export default function Stories() {
     {!stories.length ? <Empty title="No stories yet" body="A story can be one photo or a whole trip." action="Start a story" onAction={() => router.push('/story/new')} /> : null}
     {stories.length > 0 && !shown.length ? <View style={styles.empty}>
       <Text style={styles.storyTitle}>No matching stories</Text>
-      <Small>Choose All or change a story's category using Edit category.</Small>
+      <Small>Choose All or change a story’s category using Edit category.</Small>
     </View> : null}
     {calendar ?
       [...sections.entries()].map(([month, list]) => <View key={month} style={{ marginTop: 8 }}>
