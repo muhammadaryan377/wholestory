@@ -1,0 +1,23 @@
+name: Check Whole Stories onboarding
+on:
+  push:
+    branches: [feature/whole-stories-intro-swipe]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Existing regression tests
+        run: node scripts/test-regressions.cjs
