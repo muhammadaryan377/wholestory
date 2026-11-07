@@ -237,7 +237,7 @@ test('pending invitation survives sign-in transitions and clears only the matchi
   };
   const links = load('lib/invite-links.ts', {}, { process: { env: {} } });
   const pending = load('lib/pending-invite.ts', {
-    '@react-native-async-storage/async-storage': { default: storage },
+    '@react-native-async-storage/async-storage': { __esModule: true, default: storage },
     './invite-links': links,
   }, { Date });
   await pending.rememberInvite('e84365e5ffc7');
