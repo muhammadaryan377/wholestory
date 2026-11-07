@@ -15,6 +15,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Validate Expo app config
+        run: npx expo config --type public --json > /dev/null
       - name: Typecheck
         run: npx tsc --noEmit
       - name: Lint
