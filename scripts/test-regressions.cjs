@@ -248,3 +248,29 @@ test('pending invitation survives sign-in transitions and clears only the matchi
   assert.equal(await pending.pendingInvite(), null);
   await assert.rejects(pending.rememberInvite('../unsafe'), /Invalid/);
 });
+
+test('story categories and map locations are stored per account with explicit user selection', async () => {
+  const cache = new Map();
+  const storage = { getItem: async key => cache.get(key) ?? null,
+    setItem: async (key, value) => { cache.set(key, value); },
+    removeItem: async key => { cache.delete(key); } };
+  const id = '00000000-0000-4000-8000-000000000001';
+  const supabase = { auth: { getSession: async () => ({ data: { session: { user: { id: 'first' } } } }) } };
+  const prefs = load('lib/story-preferences.ts', {
+    '@react-native-async-storage/async-storage': { __esModule: true, default: storage },
+    './supabase': { supabase },
+    './api': { listStories: async () => [{ id, title: 'Trip', lat: 20, lng: 30 }] },
+  });
+  await prefs.saveStoryPreference('first', id, { category: 'Travel', location: { lat: 50.1, lng: 3.2, source: 'manual' } });
+  assert.equal((await prefs.getStoryPreferences('first'))[id].category, 'Travel');
+  assert.equal(Object.keys(await prefs.getStoryPreferences('second')).length, 0);
+  const [story] = await prefs.listStoriesWithPreferences();
+  assert.equal(story.category, 'Travel');
+  assert.equal(story.lat, 50.1);
+  assert.equal(story.lng, 3.2);
+  await prefs.clearStoryLocation('first', id);
+  assert.equal((await prefs.getStoryPreferences('first'))[id].location, undefined);
+  assert.equal((await prefs.getStoryPreferences('first'))[id].category, 'Travel');
+  await assert.rejects(prefs.saveStoryPreference('first', id, { location: { lat: 191, lng: 30, source: 'current' } }), /Invalid location/);
+  await assert.rejects(prefs.saveStoryPreference('first', id, { category: 'Machine guessed it' }), /Invalid category/);
+});
