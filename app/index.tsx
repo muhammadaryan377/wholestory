@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth';
 import { isConfigured, supabase } from '@/lib/supabase';
 import { Loading } from '@/components/ui';
 import { isSetupComplete } from '@/lib/moment-groups';
+import { pendingInvite } from '@/lib/pending-invite';
 
 const AUTO_GUEST = process.env.EXPO_PUBLIC_TEST_AUTO_GUEST === 'true';
 const INTRO_SEEN_KEY = 'ws_intro_seen_v1';
@@ -14,6 +15,7 @@ export default function Index() {
   const [guestAttempted, setGuestAttempted] = useState(false);
   const [introSeen, setIntroSeen] = useState<boolean | null>(null);
   const [setupState, setSetupState] = useState<{ userId: string; done: boolean } | null>(null);
+  const [pendingCode, setPendingCode] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     let mounted = true;
@@ -21,6 +23,13 @@ export default function Index() {
       .then(value => { if (mounted) setIntroSeen(value === '1'); })
       .catch(() => { if (mounted) setIntroSeen(false); });
     return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    pendingInvite().then(value => { if (active) setPendingCode(value); })
+      .catch(() => { if (active) setPendingCode(null); });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -48,7 +57,10 @@ export default function Index() {
   if (session) {
     if (session.user.is_anonymous) return <Redirect href="/(tabs)" />;
     if (!setupState || setupState.userId !== session.user.id) return <Loading />;
-    return <Redirect href={setupState.done ? '/(tabs)' : '/onboarding'} />;
+    if (!setupState.done) return <Redirect href="/onboarding" />;
+    if (pendingCode === undefined) return <Loading />;
+    if (pendingCode) return <Redirect href={{ pathname: '/join/[code]', params: { code: pendingCode } }} />;
+    return <Redirect href="/(tabs)" />;
   }
   if (AUTO_GUEST && !guestAttempted) return <Loading />;
   if (introSeen === null) return <Loading />;
