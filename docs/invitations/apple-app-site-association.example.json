@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "REPLACE_WITH_APPLE_TEAM_ID.app.wholestory.ios",
+        "paths": [
+          "/join/*"
+        ]
+      }
+    ]
+  }
+}
