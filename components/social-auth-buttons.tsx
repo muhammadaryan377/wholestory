@@ -13,7 +13,7 @@ export function SocialAuthButtons({ onError }: { onError: (message: string) => v
     setWorking(provider);
     try {
       const complete = await signInWithSocialProvider(provider);
-      if (complete) router.replace('/(tabs)');
+      if (complete) router.replace('/');
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Unable to sign in. Please try again.');
     } finally {
