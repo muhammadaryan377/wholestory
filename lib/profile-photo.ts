@@ -19,7 +19,7 @@ export async function chooseLocalProfilePhoto(userId: string): Promise<string | 
   if (!FileSystem.documentDirectory) throw new Error('Local photo storage is unavailable.');
   const destination = FileSystem.documentDirectory + 'ws-profile-' + userId + '.jpg';
   // Copy first: a failed image conversion or disk write must not remove the old avatar.
-  const staging = FileSystem.documentDirectory + 'ws-profile-' + userId + '-staging.jpg';
+  const staging = FileSystem.documentDirectory + 'ws-profile-' + userId + '-staging-' + Date.now() + '.jpg';
   await FileSystem.copyAsync({ from: choice.assets[0].uri, to: staging });
   try {
     if ((await FileSystem.getInfoAsync(destination)).exists) {
@@ -29,11 +29,12 @@ export async function chooseLocalProfilePhoto(userId: string): Promise<string | 
       await FileSystem.moveAsync({ from: destination, to: backup });
       try {
         await FileSystem.moveAsync({ from: staging, to: destination });
-        await FileSystem.deleteAsync(backup, { idempotent: true });
       } catch (error) {
+        // Keep the existing picture if copying the replacement fails.
         await FileSystem.moveAsync({ from: backup, to: destination });
         throw error;
       }
+      await FileSystem.deleteAsync(backup, { idempotent: true }).catch(() => {});
     } else {
       await FileSystem.moveAsync({ from: staging, to: destination });
     }
