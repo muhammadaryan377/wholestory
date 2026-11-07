@@ -12,7 +12,7 @@ export default function Join() {
   const params = useLocalSearchParams<{ code?: string }>();
   const code = typeof params.code === 'string' && validInviteCode(params.code) ? params.code : null;
   const { session, ready } = useAuth();
-  const userId = session?.user.id;
+  const userId = session?.user.is_anonymous ? null : session?.user.id;
   const [err, setErr] = useState('');
   const [retry, setRetry] = useState(0);
   const attempted = useRef('');
@@ -49,7 +49,7 @@ export default function Join() {
 
   if (!ready) return <Loading />;
   if (!code) return <Screen><H1>Invalid invitation</H1><P muted>This link is missing a valid invitation code. Ask the story owner to send a new link.</P><Btn title="Back" onPress={() => router.replace('/')} /></Screen>;
-  if (!session) return <Screen>
+  if (!session || session.user.is_anonymous) return <Screen>
     <H1>You’ve been invited</H1>
     <P muted style={{ marginBottom: 15 }}>Sign in or create an account to add your perspective to a shared Whole Stories memory. Your invitation will be kept while you sign in.</P>
     <Btn title="Log in to join" onPress={() => continueAuth('/sign-in')} />
