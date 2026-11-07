@@ -147,7 +147,7 @@ export default function Onboarding() {
         id: group.id, title: group.title, assetIds: group.assets.map(a => a.id),
       })));
       await markSetupComplete(userId);
-      router.replace('/(tabs)');
+      router.replace('/');
     } catch (reason) {
       Alert.alert('Could not finish setup', reason instanceof Error ? reason.message : 'Please try again.');
     } finally { setBusy(false); }
@@ -262,7 +262,7 @@ export default function Onboarding() {
     if (!userId) return;
     await saveNamedMoments(userId, groups.map(group => ({ id: group.id, title: group.title, assetIds: group.assets.map(a => a.id) })));
     await markSetupComplete(userId);
-    router.replace('/(tabs)');
+    router.replace('/');
   };
 
   const restorePlan = async () => {
