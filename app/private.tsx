@@ -54,6 +54,7 @@ export default function Private() {
   const { session } = useAuth();
   const key = `${KEY}_${session?.user.id ?? 'signed_out'}`;
   const [saved, setSaved] = useState<string | null | undefined>(undefined);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [secureError, setSecureError] = useState('');
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [entry, setEntry] = useState(''); const [first, setFirst] = useState('');
@@ -65,13 +66,16 @@ export default function Private() {
   const [resetBusy, setResetBusy] = useState(false); const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
-    setSaved(undefined);
-    setSecureError('');
-    writeEntry('');
-    setFirst('');
     SecureStore.getItemAsync(key)
-      .then(value => { if (active) setSaved(value); })
-      .catch(() => { if (active) setSecureError('Could not securely load your private PIN. Please try again.'); });
+      .then(value => {
+        if (!active) return;
+        setSaved(value);
+        setLoadedFor(key);
+        setSecureError('');
+        writeEntry('');
+        setFirst('');
+      })
+      .catch(() => { if (active) { setLoadedFor(null); setSecureError('Could not securely load your private PIN. Please try again.'); } });
     return () => { active = false; };
   }, [key, loadAttempt, writeEntry]);
   useFocusEffect(useCallback(() => { if (open) listStories({ private: true }).then(setStories).catch(e => setError(e.message ?? 'Could not load private stories.')); }, [open]));
@@ -110,7 +114,7 @@ export default function Private() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not reset passcode.'); }
     finally { setResetBusy(false); }
   };
-  if (saved === undefined) return <Screen>{secureError ? <><H1>Private albums unavailable</H1><P accessibilityRole="alert">{secureError}</P><Btn title="Retry securely" kind="outline" onPress={() => setLoadAttempt(n => n + 1)} /></> : <P>Loading private albums…</P>}</Screen>;
+  if (saved === undefined || loadedFor !== key) return <Screen>{secureError ? <><H1>Private albums unavailable</H1><P accessibilityRole="alert">{secureError}</P><Btn title="Retry securely" kind="outline" onPress={() => { setSecureError(''); setLoadedFor(null); setLoadAttempt(n => n + 1); }} /></> : <P>Loading private albums…</P>}</Screen>;
   if (!open) return (
     <Screen>
       <H1 style={{ textAlign: 'center', marginTop: 8 }}>{saved ? 'Private' : 'Set Privacy PIN'}</H1>
