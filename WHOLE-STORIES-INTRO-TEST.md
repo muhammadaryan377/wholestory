@@ -5,11 +5,13 @@ Branch: feature/whole-stories-intro-swipe
 This branch is for review and device testing only. Keep main untouched until checks and iPhone testing pass.
 
 ## First launch introduction
-- Logged-out first launch: 5 swipeable introduction pages (plus native splash).
-- Check swipe left/right, Next, Back, Skip, pagination dots, login link and repeated fast taps.
+- Logged-out first launch: an in-app splash (about 2 seconds, or tap) and then 5 swipeable introduction pages: a full-screen hero followed by 4 pages with 4 progress dots.
+- Check swipe left/right, Next, Skip, tapping the progress dots, login link and repeated fast taps.
+- Voice page ("Try it"): the bottom button starts a recording and then turns into Next. Check mic permission allow/deny, stop, play back (also with the silent switch on), Record again, and swiping or tapping Next while recording. The demo clip stays in the temporary cache only and is never uploaded or saved to an account.
 - Intro completion is saved locally, so returning signed-out users go to Login.
 - Existing logged-in users open Home when their profile setup is already complete.
-- The introduction uses remote **preview-only sample photos**; replace them with locally bundled approved assets before a production release.
+- The introduction photos are bundled in `assets/onboarding/` (no internet needed). The photo, voice, timeline and collaboration crops come from the design handoff. The welcome background was reconstructed from the supplied reference to remove baked-in text and buttons; live text and accessible controls are rendered by the app. See `assets/onboarding/README.md` for provenance.
+- The introduction uses the reference cream/navy/green palette, a glowing splash, and a centered layout capped at 480 pixels on wider screens. Short viewports can scroll each page vertically while navigation remains visible. Background images have explicit full-container dimensions on web and native.
 
 ## New-account four-step setup
 1. Profile: name, optional local-only profile photo, interests and Morning Memory preference.
@@ -30,4 +32,4 @@ This branch is for review and device testing only. Keep main untouched until che
 - Run: npm ci; npx tsc --noEmit; npm run lint; node scripts/test-regressions.cjs
 
 The GitHub Actions workflow runs TypeScript, lint and existing regression tests on this branch.
-**Do not merge before real-device acceptance testing.** Decorative marketing imagery is not final bundled artwork.
+**Do not merge before real-device acceptance testing.** The reconstructed hero should receive visual design approval before release.
