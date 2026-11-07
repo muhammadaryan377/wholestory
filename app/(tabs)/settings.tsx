@@ -55,7 +55,7 @@ export default function Settings() {
     ]);
   };
   const save = async () => { setBusy(true); try { await saveName(name.trim()); Alert.alert('Saved'); } finally { setBusy(false); } };
-  const del = () => Alert.alert('Delete your account?', 'This deletes your account, stories, photos and recordings from Wholestory. Your originals stay on your phone. This cannot be undone.', [
+  const del = () => Alert.alert('Delete your account?', 'This deletes your account, stories, photos and recordings from Whole Stories. Your originals stay on your phone. This cannot be undone.', [
     { text: 'Cancel', style: 'cancel' },
     { text: 'Delete everything', style: 'destructive', onPress: async () => { try { await deleteAccount(); router.replace('/'); } catch (e: any) { Alert.alert('Could not delete', e.message); } } },
   ]);
@@ -96,7 +96,7 @@ export default function Settings() {
       <NavRow title="Privacy Policy" onPress={() => Linking.openURL(PRIVACY_URL)} />
       <NavRow title="Terms of Use" onPress={() => Linking.openURL(TERMS_URL)} />
       <H2 style={{ marginTop: 14 }}>Help</H2>
-      <NavRow title="Contact us or send feedback" sub={SUPPORT} onPress={() => Linking.openURL(`mailto:${SUPPORT}?subject=Wholestory%20test%20feedback`)} />
+      <NavRow title="Contact us or send feedback" sub={SUPPORT} onPress={() => Linking.openURL(`mailto:${SUPPORT}?subject=Whole Stories%20test%20feedback`)} />
       <Btn title="Log out" kind="outline" onPress={async () => {
         await savePushToken(null).catch(() => {});
         const { error } = await supabase.auth.signOut();
@@ -104,7 +104,7 @@ export default function Settings() {
         router.replace('/');
       }} style={{ marginTop: 18 }} />
       <NavRow title="Delete my account" danger onPress={del} />
-      <Small style={{ textAlign: 'center', marginTop: 10 }}>Wholestory test version</Small>
+      <Small style={{ textAlign: 'center', marginTop: 10 }}>Whole Stories test version</Small>
     </Screen>
   );
 }
