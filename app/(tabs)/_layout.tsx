@@ -36,7 +36,7 @@ export default function TabLayout() {
   }, [userId, session?.user.is_anonymous]));
   useFocusEffect(useCallback(() => { void checkAccess(); return () => { accessRequest.current += 1; }; }, [checkAccess]));
   if (!ready) return <Loading />;
-  if (!session) return <Redirect href="/welcome" />;
+  if (!session) return <Redirect href="/" />;
   if (!session.user.is_anonymous && (setup?.userId !== userId || !setup)) return <Loading />;
   if (!session.user.is_anonymous && setup && !setup.done) return <Redirect href="/onboarding" />;
   if (PAYMENTS_ENABLED && access?.userId !== userId) return <Loading />;
