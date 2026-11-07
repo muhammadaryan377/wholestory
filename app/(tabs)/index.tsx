@@ -27,6 +27,7 @@ export default function Today() {
   const { session } = useAuth();
   const userId = session?.user.id;
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [avatarRevision, setAvatarRevision] = useState(0);
   const [name, setName] = useState('');
   const [stories, setStories] = useState<StoryWithPreference[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -43,7 +44,7 @@ export default function Today() {
         myName(), listStoriesWithPreferences(), memoryFilter(), getPrefs(),
       ]);
       setName(savedName);
-      if (userId) setAvatar(await readLocalProfilePhoto(userId).catch(() => null));
+      if (userId) { setAvatar(await readLocalProfilePhoto(userId).catch(() => null)); setAvatarRevision(v => v + 1); }
       setStories(allStories); setKeep(() => filter);
       const canRead = await libraryAllowed();
       setAllowed(canRead);
@@ -61,7 +62,7 @@ export default function Today() {
     setPhotoBusy(true);
     try {
       const uri = await chooseLocalProfilePhoto(userId);
-      if (uri) setAvatar(uri);
+      if (uri) { setAvatar(uri); setAvatarRevision(v => v + 1); }
     } catch (e) { Alert.alert('Could not update profile photo', e instanceof Error ? e.message : 'Try again.'); }
     finally { setPhotoBusy(false); }
   };
@@ -89,7 +90,7 @@ export default function Today() {
             <P muted style={{ fontSize: 13 }}>A few ideas. More memories to discover.</P>
           </View>
           <Pressable onPress={() => runAction(choosePhoto)} accessibilityRole="button" accessibilityLabel={avatar ? 'Change profile photo' : 'Add profile photo'} disabled={photoBusy} style={styles.avatarButton}>
-            {avatar ? <Image source={{ uri: avatar }} style={styles.avatar} contentFit="cover" cachePolicy="none" /> :
+            {avatar ? <Image key={avatarRevision} source={{ uri: avatar }} style={styles.avatar} contentFit="cover" cachePolicy="none" /> :
               <Text style={{ fontFamily: F.serif, fontSize: 24, color: C.green }}>{(name[0] ?? '+').toUpperCase()}</Text>}
             <View style={styles.avatarPlus}><Text style={{ color: C.white, fontSize: 11 }}>＋</Text></View>
           </Pressable>
