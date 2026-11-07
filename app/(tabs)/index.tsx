@@ -108,9 +108,13 @@ export default function Today() {
             <Text style={styles.heroSub}>{featured.entryCount ?? 0} moments · Still growing</Text>
             <Text style={styles.heroArrow}>›</Text>
           </View>
-        </Pressable> : <Pressable onPress={() => router.push('/story/new')} style={styles.softCard}>
-          <Text style={styles.subheading}>Your first story starts here</Text>
-          <Small>Choose a photo, and add the story behind it.</Small>
+        </Pressable> : <Pressable accessibilityRole="button" accessibilityLabel="Create a story" onPress={() => router.push('/story/new')} style={styles.hero}>
+          <Image source={require('../../assets/onboarding/couple.jpg')} style={styles.heroPhoto} contentFit="cover" />
+          <View style={styles.heroOverlay}>
+            <Text style={styles.heroTitle}>{visible.length ? 'Add a photo to your story' : 'Your first story starts here'}</Text>
+            <Text style={styles.heroSub}>Example photo · Tell the story behind your own moments</Text>
+            <Text style={styles.heroArrow}>›</Text>
+          </View>
         </Pressable>}
 
         <View style={styles.sectionHeading}><H2>This day last year</H2><Pressable onPress={() => router.push('/(tabs)/stories')}><Text style={styles.seeAll}>See all ›</Text></Pressable></View>
