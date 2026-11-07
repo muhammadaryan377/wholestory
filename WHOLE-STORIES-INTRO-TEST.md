@@ -1,24 +1,33 @@
-# Whole Stories intro: swipe-test branch
+# Whole Stories — combined onboarding + privacy keypad test branch
 
-This branch adds five swipeable introduction pages before sign-up. The existing Expo splash screen is unchanged, and the existing authenticated profile onboarding (`app/onboarding.tsx`) is preserved.
+Branch: feature/whole-stories-intro-swipe
 
-## Behavior
-- New signed-out installation: introductory pages, then sign-up.
-- Swipe horizontally, tap Next or Back, or tap progress dots.
-- Skip and Get started mark the introduction seen in AsyncStorage.
-- Already have an account links to sign-in.
-- Returning signed-out installation goes to sign-in; logged-in installations go home.
-- Internal anonymous-auth preview builds retain their guest sign-in behavior.
+This branch is for review and device testing only. Keep main untouched until checks and iPhone testing pass.
 
-## Images: preview-only
-The image URIs in `app/welcome.tsx` are **temporary remote preview photos**. They are not the approved final image assets. Before release, copy the separately prepared real photos into `assets/onboarding/`, replace each network URI with static `require('../assets/onboarding/name.jpg')` references, and test offline loading.
+## First launch introduction
+- Logged-out first launch: 5 swipeable introduction pages (plus native splash).
+- Check swipe left/right, Next, Back, Skip, pagination dots, login link and repeated fast taps.
+- Intro completion is saved locally, so returning signed-out users go to Login.
+- Existing logged-in users open Home when their profile setup is already complete.
+- The introduction uses remote **preview-only sample photos**; replace them with locally bundled approved assets before a production release.
 
-## Test checklist
-1. Pull this branch and start your Expo development build.
-2. On a clean app storage install, verify every page, all Next/Back controls, dot navigation, and swipes in both directions.
-3. Check Skip, Get started and Log in routes.
-4. Restart after skipping: intro should not repeat.
-5. Verify existing authenticated users open Home directly and sign-up still reaches existing profile setup.
-6. Test iPhone small/large screens, accessibility tap targets, offline images after final asset bundling.
+## New-account four-step setup
+1. Profile: name, optional local-only profile photo, interests and Morning Memory preference.
+2. Photos: permission disclosure, Allow access or Not now.
+3. Moments: actual authorized-gallery count, date/time-based suggested groups, real thumbnails. Tap any group to rename and add/remove photos, create a new group, load more gallery photos, or remove a group. All saved names and asset IDs remain per account **on the device**. There is no AI analysis and **grouping never uploads photos**.
+4. Plans: when payments are disabled, show explicit Free Preview plus inactive Yearly/Monthly previews; no fake charges or trial. With payments enabled, display real RevenueCat offerings, the App Store price, purchasing and restore controls. There is no free-plan bypass while the app's existing paid-access gate is active. A free tier and 7-day trial need their own approved billing configuration.
 
-This branch has not been device-tested in ChatGPT. Do not merge until assets are bundled and acceptance testing passes.
+## Check test scenarios
+- Clean install, email signup with/without confirmation, Apple and Google first signup.
+- Existing user login, logout/login, switching between two accounts on the same phone.
+- Full vs limited vs denied Photos permission, empty gallery, 300+ photos, older photos, app resume.
+- Generated group names are date/time labels (not invented cities). User renames to e.g. 'Sunday breakfast' and saved title appears in Home/Suggestions.
+- Photo selection, group creation, edit, transfer between groups, delete. Verify photos remain in camera roll.
+- Close and reopen after setup and after a partial setup. Check names and group associations.
+- Check restricted/offline networks, cancellation/failure of purchase, restoration and paywall access guard.
+- Check Private album 6-digit keypad including delete (#), clear (*), wrong PIN, Face ID and reset.
+- Test small and large iPhones, long names, device text scale and the keyboard showing.
+- Run: npm ci; npx tsc --noEmit; npm run lint; node scripts/test-regressions.cjs
+
+The GitHub Actions workflow runs TypeScript, lint and existing regression tests on this branch.
+**Do not merge before real-device acceptance testing.** Decorative marketing imagery is not final bundled artwork.
