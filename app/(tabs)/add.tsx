@@ -9,7 +9,7 @@ const Option = ({ title, sub, onPress }: { title: string; sub: string; onPress: 
 export default function Add() {
   return (
     <Screen>
-      <H1>Add to Wholestory</H1>
+      <H1>Add to Whole Stories</H1>
       <P muted style={{ marginBottom: 14 }}>What would you like to keep?</P>
       <Option title="A new story" sub="Choose photos and tell what happened, by voice or in writing." onPress={() => router.push('/story/new')} />
       <Option title="Tell the whole story" sub="Choose photos from a trip or day, talk through it once, and each part is pinned to its photo." onPress={() => router.push('/story/tell')} />
