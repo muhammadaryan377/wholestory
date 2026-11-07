@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/lib/auth';
 import { isConfigured, supabase } from '@/lib/supabase';
 import { Loading } from '@/components/ui';
+import { isSetupComplete } from '@/lib/moment-groups';
 
 const AUTO_GUEST = process.env.EXPO_PUBLIC_TEST_AUTO_GUEST === 'true';
 const INTRO_SEEN_KEY = 'ws_intro_seen_v1';
@@ -12,6 +13,7 @@ export default function Index() {
   const { session, ready } = useAuth();
   const [guestAttempted, setGuestAttempted] = useState(false);
   const [introSeen, setIntroSeen] = useState<boolean | null>(null);
+  const [setupState, setSetupState] = useState<{ userId: string; done: boolean } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -20,6 +22,16 @@ export default function Index() {
       .catch(() => { if (mounted) setIntroSeen(false); });
     return () => { mounted = false; };
   }, []);
+
+  useEffect(() => {
+    const userId = session?.user.id;
+    if (!userId || session?.user.is_anonymous) { setSetupState(null); return; }
+    let active = true;
+    isSetupComplete(userId).then(done => {
+      if (active) setSetupState({ userId, done });
+    }).catch(() => { if (active) setSetupState({ userId, done: true }); });
+    return () => { active = false; };
+  }, [session?.user.id, session?.user.is_anonymous]);
 
   useEffect(() => {
     if (!AUTO_GUEST || !isConfigured || !ready || session || guestAttempted) return;
@@ -33,7 +45,11 @@ export default function Index() {
 
   if (!isConfigured) return <Redirect href="/setup" />;
   if (!ready) return <Loading />;
-  if (session) return <Redirect href="/(tabs)" />;
+  if (session) {
+    if (session.user.is_anonymous) return <Redirect href="/(tabs)" />;
+    if (!setupState || setupState.userId !== session.user.id) return <Loading />;
+    return <Redirect href={setupState.done ? '/(tabs)' : '/onboarding'} />;
+  }
   if (AUTO_GUEST && !guestAttempted) return <Loading />;
   if (introSeen === null) return <Loading />;
   return <Redirect href={introSeen ? '/sign-in' : '/welcome'} />;
