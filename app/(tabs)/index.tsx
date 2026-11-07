@@ -61,7 +61,7 @@ export default function Today() {
     setPhotoBusy(true);
     try {
       const uri = await chooseLocalProfilePhoto(userId);
-      if (uri) setAvatar(uri + '?v=' + Date.now()); // refresh after replacing cached image
+      if (uri) setAvatar(uri);
     } catch (e) { Alert.alert('Could not update profile photo', e instanceof Error ? e.message : 'Try again.'); }
     finally { setPhotoBusy(false); }
   };
@@ -89,7 +89,7 @@ export default function Today() {
             <P muted style={{ fontSize: 13 }}>A few ideas. More memories to discover.</P>
           </View>
           <Pressable onPress={() => runAction(choosePhoto)} accessibilityRole="button" accessibilityLabel={avatar ? 'Change profile photo' : 'Add profile photo'} disabled={photoBusy} style={styles.avatarButton}>
-            {avatar ? <Image source={{ uri: avatar }} style={styles.avatar} contentFit="cover" /> :
+            {avatar ? <Image source={{ uri: avatar }} style={styles.avatar} contentFit="cover" cachePolicy="none" /> :
               <Text style={{ fontFamily: F.serif, fontSize: 24, color: C.green }}>{(name[0] ?? '+').toUpperCase()}</Text>}
             <View style={styles.avatarPlus}><Text style={{ color: C.white, fontSize: 11 }}>＋</Text></View>
           </Pressable>
