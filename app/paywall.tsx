@@ -19,7 +19,7 @@ export default function Paywall() {
     <Screen>
       <View style={{ alignItems: 'center' }}><Thread width={160} /></View>
       <H1>Keep every story growing</H1>
-      <P muted style={{ marginBottom: 12 }}>Everything in Wholestory, including event walls of any size.</P>
+      <P muted style={{ marginBottom: 12 }}>Everything in Whole Stories, including event walls of any size.</P>
       {pkgs.map((p, i) => (
         <Pressable key={p.identifier} onPress={() => setSel(i)} style={{ borderWidth: 1.5, borderColor: sel === i ? C.green : C.line, backgroundColor: sel === i ? C.greenSoft : C.card, borderRadius: 14, padding: 14, marginBottom: 10 }}>
           <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.navy }}>{p.packageType === 'ANNUAL' ? 'Yearly' : 'Monthly'} · {p.product.priceString}</Text>
