@@ -28,7 +28,7 @@ export default function PersonPage() {
   const hero = photos[0];
   return (
     <>
-      <Stack.Screen options={{ title: '', headerRight: () => <Pressable onPress={del} hitSlop={12}><Text style={{ color: C.red }}>Remove</Text></Pressable> }} />
+      <Stack.Screen options={{ title: '', headerRight: () => <Pressable onPress={del} hitSlop={12}><Text style={{ color: C.red, fontFamily: F.sansMedium }}>Remove</Text></Pressable> }} />
       <Screen>
         <View style={{ marginHorizontal: -S.pad, marginTop: -S.pad, marginBottom: 12 }}>
           {hero ? <Photo path={hero.path} size={width} style={{ height: 240, width, borderRadius: 0 }} /> : <View style={{ height: 140, backgroundColor: C.greenSoft }} />}
