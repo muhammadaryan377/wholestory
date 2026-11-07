@@ -96,7 +96,7 @@ export default function Onboarding() {
   const [galleryBusy, setGalleryBusy] = useState(false);
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
   const [packageIndex, setPackageIndex] = useState(0);
-  const [packageBusy, setPackageBusy] = useState(false);
+  const [packageBusy, setPackageBusy] = useState(PAYMENTS_ENABLED);
   const [packageError, setPackageError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -112,7 +112,6 @@ export default function Onboarding() {
   useEffect(() => {
     if (step !== 3 || !PAYMENTS_ENABLED || !userId) return;
     let alive = true;
-    setPackageBusy(true);
     configurePayments(userId).then(getPackages).then(list => {
       if (!alive) return;
       const available = list.filter(p => p.packageType === 'ANNUAL' || p.packageType === 'MONTHLY');
@@ -361,7 +360,7 @@ export default function Onboarding() {
           <Text style={styles.paragraph}>Choose which photos to explore. We’ll suggest groups by date and time, then you decide what to keep.</Text>
           <IntroPhotoCards />
           <View style={styles.benefit}><Text style={styles.benefitIcon}>♧</Text><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>Private by default</Text><Text style={styles.smallText}>Nothing is uploaded until you choose to create a story.</Text></View></View>
-          <View style={styles.benefit}><Text style={styles.benefitIcon}>✓</Text><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>You're in control</Text><Text style={styles.smallText}>Rename groups, add or remove photos, or skip this step.</Text></View></View>
+          <View style={styles.benefit}><Text style={styles.benefitIcon}>✓</Text><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>You&apos;re in control</Text><Text style={styles.smallText}>Rename groups, add or remove photos, or skip this step.</Text></View></View>
           <View style={styles.benefit}><Text style={styles.benefitIcon}>◎</Text><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>No AI or location tracking</Text><Text style={styles.smallText}>Photos are grouped on your phone using their dates and times.</Text></View></View>
         </> : null}
 
