@@ -18,11 +18,30 @@ export async function chooseLocalProfilePhoto(userId: string): Promise<string | 
   if (choice.canceled || !choice.assets[0]?.uri) return null;
   if (!FileSystem.documentDirectory) throw new Error('Local photo storage is unavailable.');
   const destination = FileSystem.documentDirectory + 'ws-profile-' + userId + '.jpg';
-  // Replacing the old file keeps the stored URI stable.
-  if ((await FileSystem.getInfoAsync(destination)).exists) await FileSystem.deleteAsync(destination, { idempotent: true });
-  await FileSystem.copyAsync({ from: choice.assets[0].uri, to: destination });
-  await AsyncStorage.setItem(avatarKey(userId), destination);
-  return destination;
+  // Copy first: a failed image conversion or disk write must not remove the old avatar.
+  const staging = FileSystem.documentDirectory + 'ws-profile-' + userId + '-staging.jpg';
+  await FileSystem.copyAsync({ from: choice.assets[0].uri, to: staging });
+  try {
+    if ((await FileSystem.getInfoAsync(destination)).exists) {
+      // Keep the old avatar as a rollback until the new copy is in place.
+      const backup = FileSystem.documentDirectory + 'ws-profile-' + userId + '-backup.jpg';
+      if ((await FileSystem.getInfoAsync(backup)).exists) await FileSystem.deleteAsync(backup, { idempotent: true });
+      await FileSystem.moveAsync({ from: destination, to: backup });
+      try {
+        await FileSystem.moveAsync({ from: staging, to: destination });
+        await FileSystem.deleteAsync(backup, { idempotent: true });
+      } catch (error) {
+        await FileSystem.moveAsync({ from: backup, to: destination });
+        throw error;
+      }
+    } else {
+      await FileSystem.moveAsync({ from: staging, to: destination });
+    }
+    await AsyncStorage.setItem(avatarKey(userId), destination);
+    return destination;
+  } finally {
+    if ((await FileSystem.getInfoAsync(staging)).exists) await FileSystem.deleteAsync(staging, { idempotent: true });
+  }
 }
 
 /** Delete only the optional avatar from this device. Story photos are unaffected. */
