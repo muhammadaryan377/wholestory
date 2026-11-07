@@ -274,3 +274,21 @@ test('story categories and map locations are stored per account with explicit us
   await assert.rejects(prefs.saveStoryPreference('first', id, { location: { lat: 191, lng: 30, source: 'current' } }), /Invalid location/);
   await assert.rejects(prefs.saveStoryPreference('first', id, { category: 'Machine guessed it' }), /Invalid category/);
 });
+
+test('iOS presentation uses the approved Whole Stories name and packaged fonts', () => {
+  const app = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'app.json'), 'utf8'));
+  const theme = fs.readFileSync(path.join(__dirname, '..', 'lib/theme.ts'), 'utf8');
+  const layout = fs.readFileSync(path.join(__dirname, '..', 'app/_layout.tsx'), 'utf8');
+  const ui = fs.readFileSync(path.join(__dirname, '..', 'components/ui.tsx'), 'utf8');
+  const settings = fs.readFileSync(path.join(__dirname, '..', 'app/(tabs)/settings.tsx'), 'utf8');
+  assert.equal(app.expo.name, 'Whole Stories');
+  assert.equal(app.expo.ios.bundleIdentifier, 'app.wholestory.ios');
+  assert.match(theme, /Newsreader_600SemiBold/);
+  assert.match(theme, /Inter_400Regular/);
+  assert.match(theme, /Inter_500Medium/);
+  assert.match(layout, /useFonts\(/);
+  assert.match(ui, /btnText: \{ fontFamily: F\.sansMedium/);
+  assert.match(settings, /router\.replace\('\/'\)/);
+  const locationPlugin = app.expo.plugins.find(p => Array.isArray(p) && p[0] === 'expo-location');
+  assert.equal(locationPlugin[1].isIosBackgroundLocationEnabled, false);
+});
