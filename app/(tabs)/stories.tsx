@@ -20,20 +20,18 @@ export default function Stories() {
   const [category, setCategory] = useState<Filter>('All');
   const [calendar, setCalendar] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const [pickerId, setPickerId] = useState<string | null>(null);
 
   const changeCategory = async (story: StoryWithPreference, next: StoryCategory) => {
     const userId = session?.user.id;
     if (!userId || editing) return;
     setEditing(story.id);
-    try { await saveStoryPreference(userId, story.id, { category: next }); await reload(); }
+    try { await saveStoryPreference(userId, story.id, { category: next }); await reload(); setPickerId(null); }
     catch (e) { Alert.alert('Could not save category', e instanceof Error ? e.message : 'Please try again.'); }
     finally { setEditing(null); }
   };
 
-  const chooseCategory = (story: StoryWithPreference) => Alert.alert('Organise this story', 'Choose the category that best describes it.', [
-    ...STORY_CATEGORIES.map(t => ({ text: t, onPress: () => { void changeCategory(story, t); } })),
-    { text: 'Cancel', style: 'cancel' as const },
-  ]);
+  const chooseCategory = (story: StoryWithPreference) => setPickerId(current => current === story.id ? null : story.id);
 
   if (error) return <LoadError error={error} onRetry={reload} />;
   if (!stories) return <Loading />;
@@ -65,6 +63,9 @@ export default function Stories() {
     <Pressable disabled={!!editing} onPress={() => chooseCategory(story)} accessibilityRole="button"
       accessibilityLabel={'Change category for ' + story.title}
       style={styles.editButton}><Text style={styles.editText}>Edit category</Text></Pressable>
+    {pickerId === story.id ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6, paddingBottom: 4 }}>
+      {STORY_CATEGORIES.map(t => <Chip key={t} label={t} on={story.category === t} onPress={() => { void changeCategory(story, t); }} />)}
+    </View> : null}
   </View>;
 
   return <Screen>
