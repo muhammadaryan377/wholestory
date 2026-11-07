@@ -24,7 +24,7 @@ export default function SignIn() {
         setMessage(error.message);
         return;
       }
-      router.replace('/(tabs)');
+      router.replace('/');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not log in. Check your connection and try again.');
     } finally {
