@@ -54,35 +54,49 @@ export default function Private() {
   const { session } = useAuth();
   const key = `${KEY}_${session?.user.id ?? 'signed_out'}`;
   const [saved, setSaved] = useState<string | null | undefined>(undefined);
+  const [secureError, setSecureError] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [entry, setEntry] = useState(''); const [first, setFirst] = useState('');
+  const entryRef = useRef('');
+  const writeEntry = (next: string) => { entryRef.current = next; setEntry(next); };
   const verifying = useRef(false);
   const open = usePrivateUnlocked(); const [stories, setStories] = useState<Story[]>([]);
   const [resetting, setResetting] = useState(false); const [password, setPassword] = useState('');
   const [resetBusy, setResetBusy] = useState(false); const [error, setError] = useState('');
-  useEffect(() => { SecureStore.getItemAsync(key).then(setSaved).catch(() => setError('Private albums are available in the iPhone app.')); }, [key]);
+  useEffect(() => {
+    let active = true;
+    setSaved(undefined);
+    setSecureError('');
+    writeEntry('');
+    setFirst('');
+    SecureStore.getItemAsync(key)
+      .then(value => { if (active) setSaved(value); })
+      .catch(() => { if (active) setSecureError('Could not securely load your private PIN. Please try again.'); });
+    return () => { active = false; };
+  }, [key, loadAttempt]);
   useFocusEffect(useCallback(() => { if (open) listStories({ private: true }).then(setStories).catch(e => setError(e.message ?? 'Could not load private stories.')); }, [open]));
   const unlock = async () => {
     try { setPrivateUnlocked(true); setError(''); setStories(await listStories({ private: true })); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Could not load private stories.'); }
+    catch (e) { setPrivateUnlocked(false); setError(e instanceof Error ? e.message : 'Could not load private stories.'); }
   };
   const faceId = async () => {
     if (!(await LocalAuthentication.hasHardwareAsync()) || !(await LocalAuthentication.isEnrolledAsync())) return Alert.alert('Biometrics unavailable', 'Use your passcode, or set up Face ID or fingerprint recognition in device settings.');
     const r = await LocalAuthentication.authenticateAsync({ promptMessage: 'Open your private albums', fallbackLabel: 'Use passcode' });
-    if (r.success) unlock();
+    if (r.success) await unlock();
   };
   const digit = async (d: string) => {
-    if (verifying.current || entry.length >= 6) return;
-    const next = (entry + d).slice(0, 6); setEntry(next);
+    if (verifying.current || entryRef.current.length >= 6) return;
+    const next = (entryRef.current + d).slice(0, 6); writeEntry(next);
     if (next.length < 6) return;
     verifying.current = true;
     try {
     if (!saved) {
-      if (!first) { setFirst(next); setEntry(''); return; }
-      if (first !== next) { Alert.alert('Passcodes didn’t match', 'Please try again.'); setFirst(''); setEntry(''); return; }
-      await SecureStore.setItemAsync(key, next); setSaved(next); setEntry(''); unlock(); return;
+      if (!first) { setFirst(next); writeEntry(''); return; }
+      if (first !== next) { Alert.alert('Passcodes didn’t match', 'Please try again.'); setFirst(''); writeEntry(''); return; }
+      await SecureStore.setItemAsync(key, next); setSaved(next); writeEntry(''); unlock(); return;
     }
-    if (next === saved) { setEntry(''); await unlock(); } else { setEntry(''); Alert.alert('Wrong passcode', 'Please try again.'); }
-    } catch (e) { setError(e instanceof Error ? e.message : 'Could not save or verify your passcode.'); setEntry(''); }
+    if (next === saved) { writeEntry(''); await unlock(); } else { writeEntry(''); Alert.alert('Wrong passcode', 'Please try again.'); }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not save or verify your passcode.'); writeEntry(''); }
     finally { verifying.current = false; }
   };
   const reset = async () => {
@@ -92,17 +106,17 @@ export default function Private() {
       const result = await supabase.auth.signInWithPassword({ email: session.user.email, password });
       if (result.error) throw result.error;
       await SecureStore.deleteItemAsync(key);
-      setPrivateUnlocked(false); setSaved(null); setFirst(''); setEntry(''); setPassword(''); setResetting(false);
+      setPrivateUnlocked(false); setSaved(null); setFirst(''); writeEntry(''); setPassword(''); setResetting(false);
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not reset passcode.'); }
     finally { setResetBusy(false); }
   };
-  if (saved === undefined) return <Screen><P>{error || 'Loading private albums…'}</P></Screen>;
+  if (saved === undefined) return <Screen>{secureError ? <><H1>Private albums unavailable</H1><P accessibilityRole="alert">{secureError}</P><Btn title="Retry securely" kind="outline" onPress={() => setLoadAttempt(n => n + 1)} /></> : <P>Loading private albums…</P>}</Screen>;
   if (!open) return (
     <Screen>
       <H1 style={{ textAlign: 'center', marginTop: 8 }}>{saved ? 'Private' : 'Set Privacy PIN'}</H1>
       <P muted style={{ textAlign: 'center' }}>{saved ? 'Enter your passcode' : first ? 'Enter the same passcode again' : 'Choose a 6-digit passcode for your private albums. It stays on this phone.'}</P>
       <Dots n={entry.length} />
-      <Keypad onDigit={digit} onBack={() => setEntry(value => value.slice(0, -1))} onClear={() => setEntry('')} />
+      <Keypad onDigit={digit} onBack={() => writeEntry(entryRef.current.slice(0, -1))} onClear={() => writeEntry('')} />
       {saved ? <Btn kind="link" title="Use Face ID" onPress={faceId} /> : null}
       {saved ? <Btn kind="link" title="Forgot your passcode?" onPress={() => Alert.alert('Reset passcode?', 'Your private stories stay safe. You will choose a new passcode after logging in again.', [
         { text: 'Cancel', style: 'cancel' }, { text: 'Reset', style: 'destructive', onPress: () => setResetting(true) }])} /> : null}
