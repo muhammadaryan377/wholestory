@@ -19,6 +19,7 @@ const sameDayLastYears = (d: string) => { const t = new Date(); const x = parseD
 
 export default function Today() {
   const { session } = useAuth();
+  const userId = session?.user.id;
   const [avatar, setAvatar] = useState<string | null>(null);
   const [name, setName] = useState(''); const [stories, setStories] = useState<Story[] | null>(null); const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -27,12 +28,12 @@ export default function Today() {
     setBusy(true);
     setError('');
     try {
-      setName(await myName()); if (session?.user.id) setAvatar(await readLocalProfilePhoto(session.user.id).catch(() => null)); const st = await listStories(); const f = await memoryFilter(); setKeep(() => f); setStories(st);
+      setName(await myName()); if (userId) setAvatar(await readLocalProfilePhoto(userId).catch(() => null)); const st = await listStories(); const f = await memoryFilter(); setKeep(() => f); setStories(st);
       const ok = await libraryAllowed(); setAllowed(ok); if (ok) setSugs(await findSuggestions(6));
       scheduleLocal(st.filter(f), await getPrefs()).catch(() => {});
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not load your stories.'); }
     finally { setBusy(false); }
-  }, [session?.user.id]);
+  }, [userId]);
   const tell = async (s: Suggestion) => { handOff({ photos: await toPicked(s.assets), title: s.title, prompt: 'What do you remember most about this?' }); router.push('/story/new'); };
   useFocusEffect(useCallback(() => { load(); }, [load]));
   const memories = (stories ?? []).filter(s => (keep ? keep(s) : !s.hidden_from_memories) && sameDayLastYears(s.story_date));
