@@ -25,7 +25,7 @@ export default function Index() {
 
   useEffect(() => {
     const userId = session?.user.id;
-    if (!userId || session?.user.is_anonymous) { setSetupState(null); return; }
+    if (!userId || session?.user.is_anonymous) return;
     let active = true;
     isSetupComplete(userId).then(done => {
       if (active) setSetupState({ userId, done });
