@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Alert } from '@/lib/alert';
 import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -18,15 +18,34 @@ const Dots = ({ n }: { n: number }) => (
     {Array.from({ length: 6 }).map((_, i) => <View key={i} style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: C.green, backgroundColor: i < n ? C.green : 'transparent' }} />)}
   </View>
 );
-function Keypad({ onDigit, onBack }: { onDigit: (d: string) => void; onBack: () => void }) {
-  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
+function Keypad({ onDigit, onBack, onClear }: { onDigit: (d: string) => void; onBack: () => void; onClear: () => void }) {
+  const { width, height } = useWindowDimensions();
+  // Keep a 3-column grid and large round keys on small and large iPhones.
+  const size = Math.min(92, Math.max(62, (width - 84) / 3.35), Math.max(62, (height - 350) / 4.8));
+  const gap = Math.min(22, Math.max(10, size * 0.18));
+  const keys = [
+    { n: '1', letters: '' }, { n: '2', letters: 'ABC' }, { n: '3', letters: 'DEF' },
+    { n: '4', letters: 'GHI' }, { n: '5', letters: 'JKL' }, { n: '6', letters: 'MNO' },
+    { n: '7', letters: 'PQRS' }, { n: '8', letters: 'TUV' }, { n: '9', letters: 'WXYZ' },
+    { n: '*', letters: '' }, { n: '0', letters: '+' }, { n: '#', letters: '' },
+  ];
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 14, marginTop: 6 }}>
-      {keys.map((k, i) => k === '' ? <View key={i} style={{ width: 76, height: 60 }} /> :
-        <Pressable key={i} onPress={() => runAction(() => k === '⌫' ? onBack() : onDigit(k))} accessibilityLabel={k === '⌫' ? 'Delete' : k}
-          style={({ pressed }) => ({ width: 76, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? C.greenSoft : C.card, borderWidth: 1, borderColor: C.line })}>
-          <Text style={{ fontFamily: F.serif, fontSize: 24, color: C.navy }}>{k}</Text>
-        </Pressable>)}
+    <View style={{ alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', width: size * 3 + gap * 2, columnGap: gap, rowGap: gap, marginTop: 8 }}>
+      {keys.map(({ n, letters }) => (
+        <Pressable key={n} accessibilityRole="button"
+          accessibilityLabel={n === '*' ? 'Clear PIN' : n === '#' ? 'Delete last digit' : `Digit ${n}`}
+          accessibilityHint={n === '*' ? 'Clear entered digits' : n === '#' ? 'Erase one digit' : undefined}
+          onPress={() => runAction(() => n === '*' ? onClear() : n === '#' ? onBack() : onDigit(n))}
+          style={({ pressed }) => ({
+            width: size, height: size, borderRadius: size / 2,
+            backgroundColor: pressed ? '#D3D3D3' : '#E9E9E9',
+            alignItems: 'center', justifyContent: 'center',
+            opacity: pressed ? 0.8 : 1,
+          })}>
+          <Text style={{ color: '#101010', fontFamily: F.sans, fontSize: size * 0.45, lineHeight: size * 0.53 }}>{n}</Text>
+          {letters ? <Text style={{ color: '#262626', fontFamily: F.sansBold, fontSize: Math.max(10, size * 0.14), letterSpacing: 2, marginTop: -2 }}>{letters}</Text> : null}
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -36,6 +55,7 @@ export default function Private() {
   const key = `${KEY}_${session?.user.id ?? 'signed_out'}`;
   const [saved, setSaved] = useState<string | null | undefined>(undefined);
   const [entry, setEntry] = useState(''); const [first, setFirst] = useState('');
+  const verifying = useRef(false);
   const open = usePrivateUnlocked(); const [stories, setStories] = useState<Story[]>([]);
   const [resetting, setResetting] = useState(false); const [password, setPassword] = useState('');
   const [resetBusy, setResetBusy] = useState(false); const [error, setError] = useState('');
@@ -51,14 +71,19 @@ export default function Private() {
     if (r.success) unlock();
   };
   const digit = async (d: string) => {
+    if (verifying.current || entry.length >= 6) return;
     const next = (entry + d).slice(0, 6); setEntry(next);
     if (next.length < 6) return;
+    verifying.current = true;
+    try {
     if (!saved) {
       if (!first) { setFirst(next); setEntry(''); return; }
       if (first !== next) { Alert.alert('Passcodes didn’t match', 'Please try again.'); setFirst(''); setEntry(''); return; }
       await SecureStore.setItemAsync(key, next); setSaved(next); setEntry(''); unlock(); return;
     }
-    if (next === saved) { setEntry(''); unlock(); } else { setEntry(''); Alert.alert('Wrong passcode', 'Please try again.'); }
+    if (next === saved) { setEntry(''); await unlock(); } else { setEntry(''); Alert.alert('Wrong passcode', 'Please try again.'); }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not save or verify your passcode.'); setEntry(''); }
+    finally { verifying.current = false; }
   };
   const reset = async () => {
     if (!session?.user.email || !password || resetBusy) return;
@@ -74,10 +99,10 @@ export default function Private() {
   if (saved === undefined) return <Screen><P>{error || 'Loading private albums…'}</P></Screen>;
   if (!open) return (
     <Screen>
-      <H1 style={{ textAlign: 'center', marginTop: 20 }}>Private</H1>
+      <H1 style={{ textAlign: 'center', marginTop: 8 }}>{saved ? 'Private' : 'Set Privacy PIN'}</H1>
       <P muted style={{ textAlign: 'center' }}>{saved ? 'Enter your passcode' : first ? 'Enter the same passcode again' : 'Choose a 6-digit passcode for your private albums. It stays on this phone.'}</P>
       <Dots n={entry.length} />
-      <Keypad onDigit={digit} onBack={() => setEntry(entry.slice(0, -1))} />
+      <Keypad onDigit={digit} onBack={() => setEntry(value => value.slice(0, -1))} onClear={() => setEntry('')} />
       {saved ? <Btn kind="link" title="Use Face ID" onPress={faceId} /> : null}
       {saved ? <Btn kind="link" title="Forgot your passcode?" onPress={() => Alert.alert('Reset passcode?', 'Your private stories stay safe. You will choose a new passcode after logging in again.', [
         { text: 'Cancel', style: 'cancel' }, { text: 'Reset', style: 'destructive', onPress: () => setResetting(true) }])} /> : null}
