@@ -191,7 +191,7 @@ export default function Welcome() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F9F5ED' },
+  root: { flex: 1, backgroundColor: C.cream },
   header: { paddingHorizontal: 22, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: { color: C.navy, fontFamily: F.serif, fontSize: 28 },
   skip: { color: C.grey, fontFamily: F.sansMedium, fontSize: 14 },
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
   mic: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#F05B55', alignItems: 'center', justifyContent: 'center', marginTop: 6 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, alignItems: 'center' },
   pagerDot: { height: 8, borderRadius: 4 },
-  action: { minHeight: 52, backgroundColor: '#58946B', borderRadius: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 16 },
+  action: { minHeight: 52, backgroundColor: C.green, borderRadius: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 16 },
   secondaryAction: { backgroundColor: '#E9EDE5' },
   actionText: { fontFamily: F.sansMedium, color: '#FFFFFF', fontSize: 15 },
 });
