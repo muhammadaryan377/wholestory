@@ -229,6 +229,26 @@ export default function Onboarding() {
     } finally { setBusy(false); }
   };
 
+  const deleteGroup = () => {
+    if (!editor?.id || !userId || busy) return;
+    Alert.alert('Remove this group?', 'Your photos will stay in your gallery. Only the suggested group will be removed.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove group', style: 'destructive', onPress: async () => {
+        setBusy(true);
+        try {
+          const remaining = groups.filter(group => group.id !== editor.id);
+          await saveNamedMoments(userId, remaining.map(group => ({
+            id: group.id, title: group.title, assetIds: group.assets.map(a => a.id),
+          })));
+          setGroups(remaining);
+          setEditor(null);
+        } catch (reason) {
+          Alert.alert('Could not remove group', reason instanceof Error ? reason.message : 'Try again.');
+        } finally { setBusy(false); }
+      } },
+    ]);
+  };
+
   const buyPlan = async () => {
     if (!packages[packageIndex] || busy) return;
     setBusy(true);
@@ -307,6 +327,9 @@ export default function Onboarding() {
         {hasMore ? <Btn title={galleryBusy ? 'Loading…' : 'Load more photos'} kind="outline" busy={galleryBusy} onPress={() => loadGallery()} /> : null}
         {galleryBusy && !editorAssets.length ? <ActivityIndicator color={C.green} /> : null}
         <Text style={styles.note}>Photos stay on your device until you explicitly add them to a story.</Text>
+        {editor.id ? <Pressable accessibilityRole="button" onPress={deleteGroup} style={{ padding: 12, alignItems: 'center', marginTop: 12 }}>
+          <Text style={{ color: C.red, fontFamily: F.sansMedium }}>Remove this group</Text>
+        </Pressable> : null}
       </ScrollView> :
       <ScrollView key={step} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {step === 0 ? <>
