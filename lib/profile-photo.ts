@@ -24,3 +24,12 @@ export async function chooseLocalProfilePhoto(userId: string): Promise<string | 
   await AsyncStorage.setItem(avatarKey(userId), destination);
   return destination;
 }
+
+/** Delete only the optional avatar from this device. Story photos are unaffected. */
+export async function removeLocalProfilePhoto(userId: string) {
+  const uri = await AsyncStorage.getItem(avatarKey(userId));
+  if (uri && (await FileSystem.getInfoAsync(uri)).exists) {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
+  }
+  await AsyncStorage.removeItem(avatarKey(userId));
+}
