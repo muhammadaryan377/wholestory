@@ -1,43 +1,123 @@
 import { useFocusResource } from '@/lib/use-focus-resource';
 import { parseDate } from '@/lib/dates';
 import { useState } from 'react';
-import { View, Text } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { LoadError, Screen, H1, Field, Card, Small, Empty, Loading, Chip } from '@/components/ui';
+import { LoadError, Screen, H1, Field, Small, Empty, Loading, Chip, runAction } from '@/components/ui';
 import { Photo } from '@/components/media';
-import { listStories } from '@/lib/api';
+import { STORY_CATEGORIES, listStoriesWithPreferences, saveStoryPreference, type StoryCategory, type StoryWithPreference } from '@/lib/story-preferences';
+import { useAuth } from '@/lib/auth';
 import { C, F } from '@/lib/theme';
 
+type Filter = 'All' | StoryCategory;
+const FILTERS: Filter[] = ['All', ...STORY_CATEGORIES];
+const monthKey = (date: string) => parseDate(date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
 export default function Stories() {
-  const { data: stories, error, reload } = useFocusResource(listStories); const [q, setQ] = useState('');
+  const { data: stories, error, reload } = useFocusResource(listStoriesWithPreferences);
+  const { session } = useAuth();
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState<Filter>('All');
+  const [calendar, setCalendar] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+
+  const changeCategory = async (story: StoryWithPreference, next: StoryCategory) => {
+    const userId = session?.user.id;
+    if (!userId || editing) return;
+    setEditing(story.id);
+    try { await saveStoryPreference(userId, story.id, { category: next }); await reload(); }
+    catch (e) { Alert.alert('Could not save category', e instanceof Error ? e.message : 'Please try again.'); }
+    finally { setEditing(null); }
+  };
+
+  const chooseCategory = (story: StoryWithPreference) => Alert.alert('Organise this story', 'Choose the category that best describes it.', [
+    ...STORY_CATEGORIES.map(t => ({ text: t, onPress: () => { void changeCategory(story, t); } })),
+    { text: 'Cancel', style: 'cancel' as const },
+  ]);
 
   if (error) return <LoadError error={error} onRetry={reload} />;
   if (!stories) return <Loading />;
-  const shown = stories.filter(s => !q.trim() || (s.searchText ?? s.title.toLowerCase()).includes(q.trim().toLowerCase()));
-  return (
-    <Screen>
-      <Small>Your life, in stories</Small>
-      <H1>Stories</H1>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 6 }}>
-        <Chip label="♥ Favourites" onPress={() => router.push('/favourites')} />
-        <Chip label="People" onPress={() => router.push('/people')} />
-        <Chip label="Map" onPress={() => router.push('/map')} />
-        <Chip label="🔒 Private" onPress={() => router.push('/private')} />
-        <Chip label="Suggested" onPress={() => router.push('/suggestions')} />
-      </View>
-      {stories.length ? <Field placeholder="Search your stories" value={q} onChangeText={setQ} /> : null}
-      {!stories.length ? <Empty title="No stories yet" body="A story can be one photo or a whole trip. Start with a few photos and your own words." action="Add photos" onAction={() => router.push('/story/new')} /> : null}
-      {stories.length && !shown.length ? <Card><Text style={{ fontFamily: F.serif, fontSize: 17, color: C.navy }}>No stories match “{q}”</Text><Small>Try a place, a person or a date.</Small></Card> : null}
-      {shown.map(s => (
-        <Card key={s.id} onPress={() => router.push(`/story/${s.id}`)} style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-          {s.cover ? <Photo path={s.cover} size={72} /> : <View style={{ width: 72, height: 72, borderRadius: 10, backgroundColor: '#E9E4D9' }} />}
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.navy }}>{s.title}</Text>
-            <Small>{s.entryCount ?? 0} {s.entryCount === 1 ? 'moment' : 'moments'} · {parseDate(s.story_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}{s.hidden_from_memories ? ' · hidden from memories' : ''}</Small>
-          </View>
-          <Text style={{ color: C.faint, fontSize: 20 }}>›</Text>
-        </Card>
-      ))}
-    </Screen>
+
+  const query = search.trim().toLowerCase();
+  const shown = stories.filter(s =>
+    (category === 'All' || s.category === category) &&
+    (!query || (s.searchText ?? s.title).toLowerCase().includes(query) ||
+      (s.category ?? '').toLowerCase().includes(query) ||
+      monthKey(s.story_date).toLowerCase().includes(query))
   );
+  const sections = new Map<string, StoryWithPreference[]>();
+  shown.forEach(story => {
+    const month = monthKey(story.story_date);
+    sections.set(month, [...(sections.get(month) ?? []), story]);
+  });
+
+  const storyCard = (story: StoryWithPreference) => <View key={story.id} style={styles.storyRow}>
+    <Pressable accessibilityRole="button" accessibilityLabel={'Open story ' + story.title}
+      onPress={() => router.push(`/story/${story.id}`)} style={styles.storyContent}>
+      {story.cover ? <Photo path={story.cover} size={76} style={styles.thumbnail} /> : <View style={[styles.thumbnail, { backgroundColor: C.greenSoft }]} />}
+      <View style={{ flex: 1, justifyContent: 'center' }}>
+        <Text style={styles.storyTitle} numberOfLines={2}>{story.title}</Text>
+        <Small>{story.entryCount ?? 0} {(story.entryCount ?? 0) === 1 ? 'moment' : 'moments'} · {monthKey(story.story_date)}</Small>
+        <Text style={styles.categoryText}>{story.category ?? 'Choose category'}</Text>
+      </View>
+      <Text style={styles.arrow}>›</Text>
+    </Pressable>
+    <Pressable disabled={!!editing} onPress={() => chooseCategory(story)} accessibilityRole="button"
+      accessibilityLabel={'Change category for ' + story.title}
+      style={styles.editButton}><Text style={styles.editText}>Edit category</Text></Pressable>
+  </View>;
+
+  return <Screen>
+    <View style={styles.titleRow}>
+      <View><Small>Your life, in stories</Small><H1>Stories</H1></View>
+      <Pressable onPress={() => router.push('/(tabs)/settings')} accessibilityLabel="Settings"><Text style={{ color: C.green, fontSize: 24 }}>⚙</Text></Pressable>
+    </View>
+    <Field placeholder="Search by story, place or keyword…" value={search} onChangeText={setSearch} returnKeyType="search" />
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+      <Chip label="List" on={!calendar} onPress={() => setCalendar(false)} />
+      <Chip label="Map" onPress={() => router.push('/map')} />
+      <Chip label="People" onPress={() => router.push('/people')} />
+      <Chip label="Calendar" on={calendar} onPress={() => setCalendar(true)} />
+    </ScrollView>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+      {FILTERS.map(f => <Chip key={f} label={f} on={category === f} onPress={() => setCategory(f)} />)}
+    </ScrollView>
+    <View style={styles.dividerRow}>
+      <Text style={styles.sectionTitle}>{calendar ? 'Stories by month' : 'Story threads'}</Text>
+      <Pressable onPress={() => router.push('/favourites')}><Text style={styles.filterLink}>♥ Favourites ›</Text></Pressable>
+    </View>
+    <Small style={{ marginBottom: 10 }}>Categories are chosen by you, never guessed from your photos.</Small>
+    {!stories.length ? <Empty title="No stories yet" body="A story can be one photo or a whole trip." action="Start a story" onAction={() => router.push('/story/new')} /> : null}
+    {stories.length > 0 && !shown.length ? <View style={styles.empty}>
+      <Text style={styles.storyTitle}>No matching stories</Text>
+      <Small>Choose All or change a story's category using Edit category.</Small>
+    </View> : null}
+    {calendar ?
+      [...sections.entries()].map(([month, list]) => <View key={month} style={{ marginTop: 8 }}>
+        <Text style={styles.month}>{month}</Text>
+        {list.map(storyCard)}
+      </View>) :
+      shown.map(storyCard)}
+    <View style={{ marginTop: 12 }}>
+      <Chip label="🔒 Private stories" onPress={() => router.push('/private')} />
+      <Chip label="Suggested moments" onPress={() => router.push('/suggestions')} />
+    </View>
+  </Screen>;
 }
+
+const styles = StyleSheet.create({
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  dividerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  sectionTitle: { fontFamily: F.serif, fontSize: 21, color: C.navy },
+  filterLink: { color: C.green, fontFamily: F.sansMedium, fontSize: 13 },
+  storyRow: { borderBottomWidth: 1, borderBottomColor: C.line, paddingVertical: 10 },
+  storyContent: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  thumbnail: { width: 76, height: 76, borderRadius: 12 },
+  storyTitle: { fontFamily: F.serif, fontSize: 18, color: C.navy },
+  categoryText: { fontFamily: F.sansMedium, color: C.green, fontSize: 11, marginTop: 6 },
+  arrow: { fontSize: 26, color: C.grey },
+  editButton: { alignSelf: 'flex-end', marginTop: -6, paddingHorizontal: 8, paddingVertical: 5 },
+  editText: { color: C.green, fontSize: 12, fontFamily: F.sansMedium },
+  month: { fontFamily: F.serif, fontSize: 19, marginBottom: 8, color: C.navy },
+  empty: { borderRadius: 14, padding: 18, backgroundColor: C.card },
+});
