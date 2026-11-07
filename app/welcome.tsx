@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F } from '@/lib/theme';
+import { useAuth } from '@/lib/auth';
 
 const INTRO_SEEN_KEY = 'ws_intro_seen_v1';
 
@@ -43,6 +44,8 @@ function Action({ label, onPress, secondary = false, disabled = false }: { label
 }
 
 export default function Welcome() {
+  const { session } = useAuth();
+  const signedIn = !!session && !session.user.is_anonymous;
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
@@ -65,12 +68,12 @@ export default function Welcome() {
     setNavigating(true);
     try {
       await AsyncStorage.setItem(INTRO_SEEN_KEY, '1');
-      router.replace(destination);
+      router.replace(signedIn ? '/(tabs)' : destination);
     } catch {
       locked.current = false;
       setNavigating(false);
     }
-  }, []);
+  }, [signedIn]);
 
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -160,11 +163,11 @@ export default function Welcome() {
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {index > 0 ? <View style={{ flex: 0.36 }}><Action label="Back" secondary onPress={() => go(index - 1)} disabled={navigating} /></View> : null}
-          <View style={{ flex: 1 }}><Action label={index === TOTAL - 1 ? 'Get started' : index === 0 ? 'Begin your story' : 'Next'}
+          <View style={{ flex: 1 }}><Action label={index === TOTAL - 1 ? (signedIn ? 'Back to Home' : 'Get started') : index === 0 ? 'Begin your story' : 'Next'}
             onPress={() => index === TOTAL - 1 ? finish() : go(index + 1)} disabled={navigating} /></View>
         </View>
         <Pressable accessibilityRole="button" disabled={navigating} onPress={() => finish('/sign-in')} style={{ alignItems: 'center', paddingVertical: 5 }}>
-          <Text style={{ color: C.grey, fontFamily: F.sans, fontSize: 13 }}>Already have an account? <Text style={{ textDecorationLine: 'underline' }}>Log in</Text></Text>
+          <Text style={{ color: C.grey, fontFamily: F.sans, fontSize: 13 }}>{signedIn ? 'Return to your stories' : 'Already have an account? '}<Text style={{ textDecorationLine: 'underline' }}>{signedIn ? 'Home' : 'Log in'}</Text></Text>
         </Pressable>
       </View>
     </View>
