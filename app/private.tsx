@@ -58,7 +58,7 @@ export default function Private() {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [entry, setEntry] = useState(''); const [first, setFirst] = useState('');
   const entryRef = useRef('');
-  const writeEntry = (next: string) => { entryRef.current = next; setEntry(next); };
+  const writeEntry = useCallback((next: string) => { entryRef.current = next; setEntry(next); }, []);
   const verifying = useRef(false);
   const open = usePrivateUnlocked(); const [stories, setStories] = useState<Story[]>([]);
   const [resetting, setResetting] = useState(false); const [password, setPassword] = useState('');
@@ -73,7 +73,7 @@ export default function Private() {
       .then(value => { if (active) setSaved(value); })
       .catch(() => { if (active) setSecureError('Could not securely load your private PIN. Please try again.'); });
     return () => { active = false; };
-  }, [key, loadAttempt]);
+  }, [key, loadAttempt, writeEntry]);
   useFocusEffect(useCallback(() => { if (open) listStories({ private: true }).then(setStories).catch(e => setError(e.message ?? 'Could not load private stories.')); }, [open]));
   const unlock = async () => {
     try { setPrivateUnlocked(true); setError(''); setStories(await listStories({ private: true })); }
