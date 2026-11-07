@@ -6,7 +6,7 @@ import * as Location from 'expo-location';
 import { Alert } from '@/lib/alert';
 import { listStoriesWithPreferences } from '@/lib/story-preferences';
 import { router, Stack } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker } from 'react-native-maps';
 import { Btn, Chip, Empty, Loading, LoadError, Small, Thread } from '@/components/ui';
 import { Photo } from '@/components/media';
@@ -31,6 +31,7 @@ function StoryPin({ story, selected }: { story: Story; selected: boolean }) {
 }
 
 export default function StoriesMap() {
+  const insets = useSafeAreaInsets();
   const { data: stories, error, reload } = useFocusResource(listStoriesWithPreferences);
   const [sel, setSel] = useState<Story | null>(null);
   const [selEntries, setSelEntries] = useState<Entry[]>([]);
@@ -73,12 +74,12 @@ export default function StoriesMap() {
         <Text style={{ fontFamily: F.serif, fontSize: 26, color: C.navy }}>Stories</Text>
         <Thread width={90} />
       </View>
-      <View style={{ flexDirection: 'row', marginTop: 8 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingTop: 8, paddingRight: 10 }}>
         <Chip label="List" onPress={() => router.navigate('/(tabs)/stories')} />
         <Chip label="Map" on />
         <Chip label="People" onPress={() => router.push('/people')} />
         <Chip label={locationBusy ? "Locating…" : "◎ My location"} onPress={goToCurrentLocation} />
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 
@@ -115,7 +116,7 @@ export default function StoriesMap() {
       {header}
 
       {/* Bottom card, as in the design: the chosen story and its photos */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.cream, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: S.pad, paddingTop: 10, paddingBottom: 30,
+      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.cream, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: S.pad, paddingTop: 10, paddingBottom: Math.max(18, insets.bottom + 10),
         shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: -3 } }}>
         <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: '#D8D2C6', alignSelf: 'center', marginBottom: 10 }} />
         {sel ? (<>
