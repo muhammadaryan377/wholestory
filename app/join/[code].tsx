@@ -12,13 +12,14 @@ export default function Join() {
   const params = useLocalSearchParams<{ code?: string }>();
   const code = typeof params.code === 'string' && validInviteCode(params.code) ? params.code : null;
   const { session, ready } = useAuth();
+  const userId = session?.user.id;
   const [err, setErr] = useState('');
   const [retry, setRetry] = useState(0);
   const attempted = useRef('');
 
   useEffect(() => {
-    if (!ready || !session || !code) return;
-    const key = session.user.id + ':' + code + ':' + retry;
+    if (!ready || !userId || !code) return;
+    const key = userId + ':' + code + ':' + retry;
     if (attempted.current === key) return;
     attempted.current = key;
     let active = true;
@@ -34,7 +35,7 @@ export default function Join() {
         if (active) setErr(reason instanceof Error ? reason.message : 'This invitation is invalid or no longer available.');
       });
     return () => { active = false; };
-  }, [ready, session?.user.id, code, retry]);
+  }, [ready, userId, code, retry]);
 
   const continueAuth = async (destination: '/sign-in' | '/sign-up') => {
     if (!code) return;
@@ -49,7 +50,7 @@ export default function Join() {
   if (!ready) return <Loading />;
   if (!code) return <Screen><H1>Invalid invitation</H1><P muted>This link is missing a valid invitation code. Ask the story owner to send a new link.</P><Btn title="Back" onPress={() => router.replace('/')} /></Screen>;
   if (!session) return <Screen>
-    <H1>You've been invited</H1>
+    <H1>You’ve been invited</H1>
     <P muted style={{ marginBottom: 15 }}>Sign in or create an account to add your perspective to a shared Whole Stories memory. Your invitation will be kept while you sign in.</P>
     <Btn title="Log in to join" onPress={() => continueAuth('/sign-in')} />
     <Btn title="Create an account" kind="outline" onPress={() => continueAuth('/sign-up')} />
@@ -57,7 +58,7 @@ export default function Join() {
       onPress={() => Linking.openURL('wholestory://' + nativeInvitePath(code))} /> : null}
     {err ? <P accessibilityRole="alert">{err}</P> : null}
   </Screen>;
-  if (err) return <Screen><H1>Couldn't join this story</H1>
+  if (err) return <Screen><H1>Couldn’t join this story</H1>
     <P muted style={{ marginBottom: 15 }}>{err}</P>
     <Btn title="Try again" onPress={() => { setErr(''); setRetry(i => i + 1); }} />
     <Btn title="Go to Home" kind="link" onPress={() => router.replace('/')} />
