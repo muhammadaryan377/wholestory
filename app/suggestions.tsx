@@ -17,7 +17,7 @@ export default function Suggestions() {
     catch (e) { setError(e instanceof Error ? e.message : 'Could not read your photo library.'); }
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
-  const allow = async () => { if (await libraryAllowed(true)) load(); else Alert.alert('Photos not allowed', 'You can allow full photo access for Wholestory in your phone Settings.'); };
+  const allow = async () => { if (await libraryAllowed(true)) load(); else Alert.alert('Photos not allowed', 'You can allow full photo access for Whole Stories in your phone Settings.'); };
   const tell = async (s: Suggestion) => { setBusy(s.id); try { handOff({ photos: await toPicked(s.assets), title: s.title, prompt: 'What do you remember most about this?' }); router.push('/story/new'); } finally { setBusy(null); } };
   const keep = async (s: Suggestion) => {
     setBusy(s.id);
@@ -25,9 +25,9 @@ export default function Suggestions() {
     catch (e: any) { Alert.alert('Could not save', e.message ?? 'Please try again.'); } finally { setBusy(null); }
   };
   if (error) return <LoadError error={error} onRetry={load} />;
-  if (Platform.OS === 'web') return <Screen><Empty title="Suggestions from your phone" body="Open Wholestory on your iPhone to find stories in your photo library. You can still choose photos when creating a story here." action="Choose photos for a story" onAction={() => router.push('/story/new')} /></Screen>;
+  if (Platform.OS === 'web') return <Screen><Empty title="Suggestions from your phone" body="Open Whole Stories on your iPhone to find stories in your photo library. You can still choose photos when creating a story here." action="Choose photos for a story" onAction={() => router.push('/story/new')} /></Screen>;
   if (allowed === null) return <Loading />;
-  if (!allowed) return <Screen><Empty title="Let Wholestory find your moments" body="Allow access to your photos and we’ll suggest stories from trips, days out and the people you love. It all happens on your phone." action="Allow photo access" onAction={allow} /></Screen>;
+  if (!allowed) return <Screen><Empty title="Let Whole Stories find your moments" body="Allow access to your photos and we’ll suggest stories from trips, days out and the people you love. It all happens on your phone." action="Allow photo access" onAction={allow} /></Screen>;
   if (!list) return <Loading />;
   return (
     <Screen>
