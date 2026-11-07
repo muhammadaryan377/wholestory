@@ -20,7 +20,8 @@
         "NSMicrophoneUsageDescription": "Wholestory records your voice when you tell a story.",
         "NSFaceIDUsageDescription": "Wholestory uses Face ID to open your private albums.",
         "NSSpeechRecognitionUsageDescription": "Wholestory turns your voice stories into words on your phone, so you can read and search them.",
-        "NSPhotoLibraryAddUsageDescription": "Wholestory can save photos from your stories to your library."
+        "NSPhotoLibraryAddUsageDescription": "Wholestory can save photos from your stories to your library.",
+        "NSLocationWhenInUseUsageDescription": "Whole Stories uses your location only when you choose to add your current place to a story."
       },
       "usesAppleSignIn": true
     },
@@ -109,7 +110,15 @@
       ],
       "@sentry/react-native/expo",
       "expo-asset",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Whole Stories to attach your current location when you choose Add Location.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
