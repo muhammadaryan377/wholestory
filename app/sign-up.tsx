@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { Screen, H1, P, Btn, Field, Small } from '@/components/ui';
+import { Screen, H1, P, Btn, Field } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { saveName } from '@/lib/api';
 import { SocialAuthButtons } from '@/components/social-auth-buttons';
