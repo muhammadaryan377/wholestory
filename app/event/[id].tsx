@@ -89,7 +89,7 @@ export default function EventScreen() {
         <Pressable onPress={() => runAction(changeCover)} accessibilityLabel="Change cover photo" style={{ marginHorizontal: -S.pad, marginTop: -S.pad, marginBottom: 12 }}>
           {ev.cover_path ? <Image source={{ uri: eventUrl(ev.cover_path) }} style={{ width: '100%', height: 210 }} contentFit="cover" />
             : <View style={{ height: 120, backgroundColor: C.greenSoft, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: F.sansMedium, color: C.green }}>＋ Add a cover photo</Text></View>}
-          {ev.cover_path ? <View style={{ position: 'absolute', right: 12, bottom: 10, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 }}><Text style={{ color: '#fff', fontSize: 12 }}>Edit cover</Text></View> : null}
+          {ev.cover_path ? <View style={{ position: 'absolute', right: 12, bottom: 10, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 }}><Text style={{ color: '#fff', fontFamily: F.sansMedium, fontSize: 12 }}>Edit cover</Text></View> : null}
         </Pressable>
         <H1>{ev.name}</H1>
         <Small style={{ marginBottom: 10 }}>{[dateRange(ev.starts_on, ev.ends_on), ev.place].filter(Boolean).join(' · ')}{ev.is_open && !expired ? '' : ' · Wall closed'}</Small>
