@@ -59,8 +59,8 @@ export default function NewEvent() {
         <View key={m.name + i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 }}>
           <TextInput value={m.time} onChangeText={t => setMoments(moments.map((x, j) => (j === i ? { ...x, time: t } : x)))} placeholder="Time" placeholderTextColor={C.faint}
             style={{ width: 84, backgroundColor: C.card, borderWidth: 1, borderColor: '#E0D9CD', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6, fontFamily: F.sans, color: C.ink }} />
-          <Text style={{ flex: 1, fontSize: 15, color: C.ink }}>{m.name}</Text>
-          <Pressable onPress={() => setMoments(moments.filter((_, j) => j !== i))} hitSlop={10}><Text style={{ color: C.red }}>Remove</Text></Pressable>
+          <Text style={{ flex: 1, fontFamily: F.sans, fontSize: 15, color: C.ink }}>{m.name}</Text>
+          <Pressable onPress={() => setMoments(moments.filter((_, j) => j !== i))} hitSlop={10}><Text style={{ fontFamily: F.sansMedium, color: C.red }}>Remove</Text></Pressable>
         </View>
       ))}
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
