@@ -3,9 +3,14 @@
     "apps": [],
     "details": [
       {
-        "appID": "REPLACE_WITH_APPLE_TEAM_ID.app.wholestory.ios",
-        "paths": [
-          "/join/*"
+        "appIDs": [
+          "REPLACE_WITH_APPLE_TEAM_ID.app.wholestory.ios"
+        ],
+        "components": [
+          {
+            "/": "/join/*",
+            "comment": "Whole Stories story invitations"
+          }
         ]
       }
     ]

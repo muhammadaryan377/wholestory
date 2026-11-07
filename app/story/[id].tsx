@@ -47,7 +47,8 @@ export default function StoryScreen() {
 
   const invite = async () => {
     const code = await inviteCode(story.id);
-    await shareStoryInvite(story.title, code);
+    const outcome = await shareStoryInvite(story.title, code);
+    if (outcome === 'copied') Alert.alert('Invitation copied', 'Sharing isn’t available here, so the invitation was copied. Paste it into any messaging app.');
   };
   const copyInvite = async () => {
     const code = await inviteCode(story.id);
