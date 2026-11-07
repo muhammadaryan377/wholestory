@@ -213,3 +213,17 @@ test('enabled subscription checks switch user identity and propagate verificatio
   fail = true;
   await assert.rejects(payments.hasAccess('second-user'), /Store unavailable/);
 });
+
+test('public story invitations use one HTTPS link and never share custom schemes', () => {
+  const links = load('lib/invite-links.ts', {}, { process: { env: { EXPO_PUBLIC_INVITE_BASE_URL: 'https://wholestory.app' } } });
+  const url = links.buildInviteUrl('e84365e5ffc7');
+  assert.equal(url, 'https://wholestory.app/join/e84365e5ffc7');
+  assert.match(links.inviteMessage('Home sweet Home', url), /https:\/\/wholestory\.app\/join\/e84365e5ffc7/);
+  assert.equal(links.inviteMessage('Home sweet Home', url).includes('wholestory://'), false);
+  assert.equal(links.nativeInvitePath('e84365e5ffc7'), '/join/e84365e5ffc7');
+  assert.throws(() => links.buildInviteUrl('../bad'), /invalid/);
+  assert.throws(() => links.buildInviteUrl('short'), /invalid/);
+  assert.throws(() => links.inviteWebOrigin('http://insecure.example'), /HTTPS/);
+  assert.throws(() => links.inviteWebOrigin('https://test.example/custom/path'), /HTTPS/);
+  assert.throws(() => links.inviteWebOrigin(''), /not configured/);
+});
