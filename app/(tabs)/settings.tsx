@@ -29,7 +29,7 @@ export default function Settings() {
   const save = async () => { setBusy(true); try { await saveName(name.trim()); Alert.alert('Saved'); } finally { setBusy(false); } };
   const del = () => Alert.alert('Delete your account?', 'This deletes your account, stories, photos and recordings from Wholestory. Your originals stay on your phone. This cannot be undone.', [
     { text: 'Cancel', style: 'cancel' },
-    { text: 'Delete everything', style: 'destructive', onPress: async () => { try { await deleteAccount(); router.replace('/welcome'); } catch (e: any) { Alert.alert('Could not delete', e.message); } } },
+    { text: 'Delete everything', style: 'destructive', onPress: async () => { try { await deleteAccount(); router.replace('/'); } catch (e: any) { Alert.alert('Could not delete', e.message); } } },
   ]);
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
   return (
