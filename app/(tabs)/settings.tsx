@@ -20,6 +20,7 @@ export default function Settings() {
   const { session } = useAuth();
   const userId = session?.user.id;
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [avatarRevision, setAvatarRevision] = useState(0);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [busy, setBusy] = useState(false); const [exporting, setExporting] = useState('');
   const [loadError, setLoadError] = useState('');
@@ -36,7 +37,7 @@ export default function Settings() {
   const chooseAvatar = async () => {
     if (!session?.user.id || photoBusy) return;
     setPhotoBusy(true);
-    try { const uri = await chooseLocalProfilePhoto(session.user.id); if (uri) setAvatar(uri); }
+    try { const uri = await chooseLocalProfilePhoto(session.user.id); if (uri) { setAvatar(uri); setAvatarRevision(v => v + 1); } }
     catch (e) { Alert.alert('Could not change profile photo', e instanceof Error ? e.message : 'Try again.'); }
     finally { setPhotoBusy(false); }
   };
@@ -66,7 +67,7 @@ export default function Settings() {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, padding: 13, borderRadius: 16, marginBottom: 15 }}>
         <Pressable accessibilityRole="button" accessibilityLabel={avatar ? 'Change your profile photo' : 'Add your profile photo'} onPress={chooseAvatar}
           disabled={photoBusy} style={{ width: 68, height: 68, backgroundColor: C.greenSoft, borderRadius: 34, alignItems: 'center', justifyContent: 'center' }}>
-          {avatar ? <Image source={{ uri: avatar }} cachePolicy="none" contentFit="cover" style={{ width: 68, height: 68, borderRadius: 34 }} /> :
+          {avatar ? <Image key={avatarRevision} source={{ uri: avatar }} cachePolicy="none" contentFit="cover" style={{ width: 68, height: 68, borderRadius: 34 }} /> :
             <Text style={{ fontFamily: F.serif, color: C.green, fontSize: 29 }}>{name[0]?.toUpperCase() ?? '+'}</Text>}
         </Pressable>
         <View style={{ flex: 1, gap: 4 }}>
@@ -100,7 +101,7 @@ export default function Settings() {
         await savePushToken(null).catch(() => {});
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
-        router.replace('/welcome');
+        router.replace('/');
       }} style={{ marginTop: 18 }} />
       <NavRow title="Delete my account" danger onPress={del} />
       <Small style={{ textAlign: 'center', marginTop: 10 }}>Wholestory test version</Small>
