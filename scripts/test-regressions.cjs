@@ -227,3 +227,24 @@ test('public story invitations use one HTTPS link and never share custom schemes
   assert.throws(() => links.inviteWebOrigin('https://test.example/custom/path'), /HTTPS/);
   assert.throws(() => links.inviteWebOrigin(''), /not configured/);
 });
+
+test('pending invitation survives sign-in transitions and clears only the matching code', async () => {
+  const records = new Map();
+  const storage = {
+    getItem: async key => records.get(key) ?? null,
+    setItem: async (key, value) => { records.set(key, value); },
+    removeItem: async key => { records.delete(key); },
+  };
+  const links = load('lib/invite-links.ts', {}, { process: { env: {} } });
+  const pending = load('lib/pending-invite.ts', {
+    '@react-native-async-storage/async-storage': { default: storage },
+    './invite-links': links,
+  }, { Date });
+  await pending.rememberInvite('e84365e5ffc7');
+  assert.equal(await pending.pendingInvite(), 'e84365e5ffc7');
+  await pending.clearPendingInvite('anothercode1');
+  assert.equal(await pending.pendingInvite(), 'e84365e5ffc7');
+  await pending.clearPendingInvite('e84365e5ffc7');
+  assert.equal(await pending.pendingInvite(), null);
+  await assert.rejects(pending.rememberInvite('../unsafe'), /Invalid/);
+});
