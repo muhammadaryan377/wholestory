@@ -9,6 +9,8 @@ import { listStories, memoryFilter, myName, type Story } from '@/lib/api';
 import { findSuggestions, libraryAllowed, toPicked, type Suggestion } from '@/lib/suggest';
 import { getPrefs, scheduleLocal } from '@/lib/notify';
 import { handOff } from '@/lib/handoff';
+import { readLocalProfilePhoto } from '@/lib/profile-photo';
+import { useAuth } from '@/lib/auth';
 import { Image } from 'expo-image';
 import { C, F, S } from '@/lib/theme';
 
@@ -16,6 +18,8 @@ const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good mor
 const sameDayLastYears = (d: string) => { const t = new Date(); const x = parseDate(d); return x.getDate() === t.getDate() && x.getMonth() === t.getMonth() && x.getFullYear() < t.getFullYear(); };
 
 export default function Today() {
+  const { session } = useAuth();
+  const [avatar, setAvatar] = useState<string | null>(null);
   const [name, setName] = useState(''); const [stories, setStories] = useState<Story[] | null>(null); const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [allowed, setAllowed] = useState<boolean | null>(null); const [sugs, setSugs] = useState<Suggestion[]>([]); const [keep, setKeep] = useState<((s: Story) => boolean) | null>(null);
@@ -23,12 +27,12 @@ export default function Today() {
     setBusy(true);
     setError('');
     try {
-      setName(await myName()); const st = await listStories(); const f = await memoryFilter(); setKeep(() => f); setStories(st);
+      setName(await myName()); if (session?.user.id) setAvatar(await readLocalProfilePhoto(session.user.id).catch(() => null)); const st = await listStories(); const f = await memoryFilter(); setKeep(() => f); setStories(st);
       const ok = await libraryAllowed(); setAllowed(ok); if (ok) setSugs(await findSuggestions(6));
       scheduleLocal(st.filter(f), await getPrefs()).catch(() => {});
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not load your stories.'); }
     finally { setBusy(false); }
-  }, []);
+  }, [session?.user.id]);
   const tell = async (s: Suggestion) => { handOff({ photos: await toPicked(s.assets), title: s.title, prompt: 'What do you remember most about this?' }); router.push('/story/new'); };
   useFocusEffect(useCallback(() => { load(); }, [load]));
   const memories = (stories ?? []).filter(s => (keep ? keep(s) : !s.hidden_from_memories) && sameDayLastYears(s.story_date));
@@ -37,7 +41,7 @@ export default function Today() {
     <SafeAreaView style={{ flex: 1, backgroundColor: C.cream }} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: S.pad, paddingBottom: 60 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ fontFamily: F.serif, fontSize: 24, color: C.navy }}>Wholestory</Text><Thread width={110} />
+          <Text style={{ fontFamily: F.serif, fontSize: 24, color: C.navy }}>Whole Stories</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Thread width={88} />{avatar ? <Image source={{ uri: avatar }} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: C.greenSoft }} contentFit="cover" accessibilityLabel="Your profile photo" /> : null}</View>
         </View>
         <H1 style={{ marginTop: 6 }}>{greet()}{name ? `, ${name}` : ''}</H1>
         <P muted style={{ marginBottom: 16 }}>A new day. More memories to discover.</P>
