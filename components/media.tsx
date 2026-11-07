@@ -19,7 +19,7 @@ export function fromAsset(a: ImagePicker.ImagePickerAsset): Picked {
   return { uri: a.uri, ...photoMetadata(a.exif ?? {}) };
 }
 
-/** A photo stored in Wholestory (private story file or event file). */
+/** A photo stored in Whole Stories (private story file or event file). */
 export function Photo({ path, event, size = 96, style }: { path: string; event?: boolean; size?: number; style?: any }) {
   const [resolved, setResolved] = useState<{ path: string; uri: string } | null>(null);
   const uri = event ? eventUrl(path) : resolved?.path === path ? resolved.uri : '';
@@ -99,7 +99,7 @@ export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: 
     }
     try {
       const p = await ImagePicker.requestCameraPermissionsAsync();
-      if (!p.granted) return Alert.alert('Camera not allowed', 'You can allow the camera for Wholestory in your phone Settings.');
+      if (!p.granted) return Alert.alert('Camera not allowed', 'You can allow the camera for Whole Stories in your phone Settings.');
       const r = await ImagePicker.launchCameraAsync({ quality: 0.85, exif: true });
       if (!r.canceled) setDraft(current => ({ ...current, photos: [...current.photos, ...r.assets.map(fromAsset)] }));
     } catch (err: any) {
@@ -126,7 +126,7 @@ export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: 
       return;
     }
     const perm = await AudioModule.requestRecordingPermissionsAsync();
-    if (!perm.granted) return Alert.alert('Microphone not allowed', 'You can allow the microphone for Wholestory in your phone Settings.');
+    if (!perm.granted) return Alert.alert('Microphone not allowed', 'You can allow the microphone for Whole Stories in your phone Settings.');
     await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
     await recorder.prepareToRecordAsync();
     localPlayer.pause();
