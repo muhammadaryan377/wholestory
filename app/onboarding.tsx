@@ -36,17 +36,24 @@ function Progress({ active }: { active: number }) {
   </View>;
 }
 
+const SAMPLE_PHOTOS = {
+  travel: 'https://images.unsplash.com/photo-1533105079780-92b9be482077?w=500&q=75',
+  memory: 'https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?w=500&q=75',
+  people: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=500&q=75',
+};
 function IntroPhotoCards() {
+  // Optional sample photography. Each card has an offline fallback, and
+  // actual moment thumbnails always come from the user's photo library.
   const art = [
-    { emoji: '🏖️', label: 'Travel', bg: '#DFEAE2' },
-    { emoji: '☀️', label: 'Memories', bg: '#F8E3D5' },
-    { emoji: '👨‍👩‍👧', label: 'People', bg: '#E5E9EF' },
+    { emoji: '🏖️', label: 'Travel', bg: '#DFEAE2', uri: SAMPLE_PHOTOS.travel },
+    { emoji: '☀️', label: 'Memories', bg: '#F8E3D5', uri: SAMPLE_PHOTOS.memory },
+    { emoji: '👨‍👩‍👧', label: 'People', bg: '#E5E9EF', uri: SAMPLE_PHOTOS.people },
   ];
-  return <View style={styles.photoCards} accessibilityLabel="Photos, moments and people illustration">
+  return <View style={styles.photoCards} accessibilityLabel="Sample photographs for stories">
     {art.map((a, i) =>
       <View key={a.label} style={[styles.artCard, { backgroundColor: a.bg, marginTop: i === 1 ? 0 : 23, transform: [{ rotate: i === 0 ? '-6deg' : i === 2 ? '6deg' : '0deg' }] }]}>
-        <Text style={{ fontSize: 45 }}>{a.emoji}</Text>
-        <Text style={{ fontFamily: F.serif, color: C.navy, fontSize: 15 }}>{a.label}</Text>
+        <Text style={{ fontSize: 43 }}>{a.emoji}</Text>
+        <Image source={{ uri: a.uri }} style={{ ...StyleSheet.absoluteFillObject, borderRadius: 13 }} contentFit="cover" transition={150} />
       </View>)}
   </View>;
 }
@@ -348,8 +355,14 @@ export default function Onboarding() {
           <Text style={styles.heading}>Keep every story growing</Text>
           <Text style={styles.paragraph}>{PAYMENTS_ENABLED ? 'Choose the plan that works for your stories.' : 'You’re all set. Subscription purchases are disabled in this test build.'}</Text>
           <View style={styles.planArt}>
-            <View style={[styles.planPhoto, { backgroundColor: '#E5EEDC', transform: [{ rotate: '-5deg' }] }]}><Text style={{ fontSize: 43 }}>🌄</Text></View>
-            <View style={[styles.planPhoto, { backgroundColor: '#F3E0D2', transform: [{ rotate: '6deg' }] }]}><Text style={{ fontSize: 43 }}>💛</Text></View>
+            <View style={[styles.planPhoto, { backgroundColor: '#E5EEDC', transform: [{ rotate: '-5deg' }] }]}>
+              <Text style={{ fontSize: 43 }}>🌄</Text>
+              <Image source={{ uri: SAMPLE_PHOTOS.travel }} style={{ ...StyleSheet.absoluteFillObject, borderRadius: 12 }} contentFit="cover" transition={150} />
+            </View>
+            <View style={[styles.planPhoto, { backgroundColor: '#F3E0D2', transform: [{ rotate: '6deg' }] }]}>
+              <Text style={{ fontSize: 43 }}>💛</Text>
+              <Image source={{ uri: SAMPLE_PHOTOS.people }} style={{ ...StyleSheet.absoluteFillObject, borderRadius: 12 }} contentFit="cover" transition={150} />
+            </View>
           </View>
           {PAYMENTS_ENABLED ? <>
             {packageBusy ? <ActivityIndicator color={C.green} /> : null}
@@ -365,7 +378,13 @@ export default function Onboarding() {
               <Text style={{ fontSize: 19, color: C.green, marginLeft: 8 }}>{i === packageIndex ? '◉' : '○'}</Text>
             </Pressable>)}
             {!packageBusy && !packages.length ? <Text style={styles.note}>No plans are available yet. Check your App Store subscription configuration.</Text> : null}
-          </> : <View style={styles.planCard}><View style={{ flex: 1 }}><Text style={styles.groupTitle}>Free preview</Text><Text style={styles.smallText}>No charge and no subscription during testing</Text></View><Text style={styles.planPrice}>Free</Text></View>}
+          </> : <>
+            {['Yearly', 'Monthly'].map(label => <View key={label} style={[styles.planCard, { opacity: 0.65 }]}>
+              <View style={{ flex: 1 }}><Text style={styles.groupTitle}>{label}</Text><Text style={styles.smallText}>Available when subscriptions are enabled</Text></View>
+              <Text style={styles.smallText}>Not active</Text>
+            </View>)}
+            <View style={[styles.planCard, styles.planCardSelected]}><View style={{ flex: 1 }}><Text style={styles.groupTitle}>Free preview</Text><Text style={styles.smallText}>No charge and no subscription during testing</Text></View><Text style={styles.planPrice}>Free</Text></View>
+          </>}
           <View style={styles.benefitsBox}>
             <Text style={[styles.groupTitle, { marginBottom: 9 }]}>Your stories include</Text>
             {['Moments and photo stories', 'Memories in your own words', 'People and shared stories', 'Control over privacy and sharing'].map(t =>
