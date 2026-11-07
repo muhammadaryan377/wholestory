@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from './supabase';
 
 export type NamedMoment = { id: string; title: string; assetIds: string[] };
 const keyFor = (userId: string) => `ws_named_moments_${userId}`;
@@ -34,7 +35,12 @@ export async function isSetupComplete(userId: string): Promise<boolean> {
   const value = await AsyncStorage.getItem(setupKey(userId));
   if (value !== null) return value === '1';
   // Compatibility with accounts that completed the original setup flow.
-  return (await AsyncStorage.getItem('ws_onboarded')) === '1';
+  if ((await AsyncStorage.getItem('ws_onboarded')) !== '1') return false;
+  // The old global flag belongs to an earlier install, not necessarily this
+  // account. Only treat it as complete when this user's profile has interests.
+  const { data, error } = await supabase.from('profiles').select('interests').eq('id', userId).maybeSingle();
+  if (error) return true; // Don't strand existing signed-in users during outages.
+  return Array.isArray(data?.interests) && data.interests.length > 0;
 }
 export async function markSetupComplete(userId: string) {
   await AsyncStorage.setItem(setupKey(userId), '1');
