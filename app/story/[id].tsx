@@ -1,9 +1,9 @@
 import { parseDate } from '@/lib/dates';
 import { useCallback, useState } from 'react';
-import { Share, View, Text, Pressable, ActionSheetIOS, Platform, Modal, ScrollView } from 'react-native';
+import { View, Text, Pressable, ActionSheetIOS, Platform, Modal, ScrollView } from 'react-native';
 import { Alert } from '@/lib/alert';
 import { router, useFocusEffect, useLocalSearchParams, Stack } from 'expo-router';
-import * as Linking from 'expo-linking';
+import { shareStoryInvite, copyStoryInvite } from '@/lib/invite-actions';
 import { LoadError, Screen, H1, Small, Card, Btn, Loading, Empty, Chip, Field, P, runAction } from '@/components/ui';
 import { Photo, VoicePlayer } from '@/components/media';
 import { Comments } from '@/components/comments';
@@ -35,8 +35,12 @@ export default function StoryScreen() {
 
   const invite = async () => {
     const code = await inviteCode(story.id);
-    const link = Linking.createURL(`/join/${code}`);
-    await Share.share({ message: `Add your side of "${story.title}" on Wholestory: ${link}` });
+    await shareStoryInvite(story.title, code);
+  };
+  const copyInvite = async () => {
+    const code = await inviteCode(story.id);
+    await copyStoryInvite(code);
+    Alert.alert('Link copied', 'You can paste this invitation into any messaging app.');
   };
   const options = () => {
     const items = ['Who’s in this story?', story.hidden_from_memories ? 'Show in memories again' : 'Hide from memories', story.private ? 'Move out of Private' : 'Move to Private', 'Rename', 'Delete story', 'Cancel'];
@@ -78,6 +82,7 @@ export default function StoryScreen() {
           <Btn title="Tell it all" kind="outline" onPress={() => router.push({ pathname: '/story/tell', params: { id: story.id, title: story.title } })} style={{ flex: 0.7 }} />
           {owner && !story.private ? <Btn title="Invite" kind="outline" onPress={invite} style={{ flex: 0.6 }} /> : null}
         </View>
+        {owner && !story.private ? <Pressable accessibilityRole="button" accessibilityLabel="Copy invitation link" onPress={() => runAction(copyInvite)} style={{ alignSelf: 'flex-end', paddingVertical: 8, paddingHorizontal: 8 }}><Text style={{ color: C.green, fontFamily: F.sansMedium, fontSize: 13 }}>Copy invite link</Text></Pressable> : null}
         {!entries.length ? <Empty title="Nothing here yet" body="Add photos, your voice or a few words." /> : null}
         {entries.map(e => (
           <Card key={e.id}>
