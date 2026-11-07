@@ -23,6 +23,13 @@ Do not merge until TestFlight / real-iPhone acceptance testing.
 GitHub Actions runs `npm ci`, `npx expo config --type public --json`, `npx tsc --noEmit`, `npm run lint`, and `node scripts/test-regressions.cjs`.
 New regression asserts app title, font registration, button typography, opt-in location settings and returning login routing.
 
+## Approved image integration (Nov 7)
+- Intro: couple, dog, timeline, voice and community assets are bundled and rendered in `app/welcome.tsx`.
+- Account setup: Photos and Plan steps use locally bundled approved collage assets; moment groups still use users' real library photos.
+- Home: if no real cover photo is available, an explicitly labelled example photograph invites story creation. Real photo covers take precedence.
+- Existing signed-in users can replay the new introduction through **Settings → View introduction** without returning to signup.
+- Web bundle is checked by CI using `npx expo export --platform web`.
+
 ## Manual iPhone tests still mandatory
 1. Install a fresh iOS preview/development build with expo-location compiled in; verify app startup, splash and Newsreader/Inter glyph rendering.
 2. Test on small and large iPhones, notch/home indicator, normal and Large Text accessibility sizes, light theme, keyboard open, screen rotation locked portrait.
@@ -37,7 +44,7 @@ New regression asserts app title, font registration, button typography, opt-in l
 11. Verify subscriptions only after enabling and configuring live RevenueCat/App Store products in a dedicated sandbox build.
 
 ## Known release blockers / limits
-- Approved onboarding illustrations are still remote temporary preview photos, not final bundled image assets.
+- Five approved onboarding illustration photos and the Photos/Plan collages are now bundled locally under `assets/onboarding/`; no external stock-photo request is needed for these screens.
 - Invites require a verified public HTTPS /join route and Apple AASA/Android association files; without that configuration sharing intentionally fails with an explicit error.
 - User-assigned categories, manual story map positions and profile avatars live on this device; cross-device synchronization needs server-backed implementation.
 - Individual Voice note Favourites saving isn't implemented; that filter displays an honest unavailable message.
