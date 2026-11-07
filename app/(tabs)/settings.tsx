@@ -18,6 +18,7 @@ const SUPPORT = process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'support@wholestory.app
 
 export default function Settings() {
   const { session } = useAuth();
+  const userId = session?.user.id;
   const [avatar, setAvatar] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [busy, setBusy] = useState(false); const [exporting, setExporting] = useState('');
@@ -28,9 +29,9 @@ export default function Settings() {
       const [name, user] = await Promise.all([myName(), supabase.auth.getUser()]);
       if (user.error) throw user.error;
       setName(name); setEmail(user.data.user?.email ?? '');
-      if (session?.user.id) setAvatar(await readLocalProfilePhoto(session.user.id).catch(() => null));
+      if (userId) setAvatar(await readLocalProfilePhoto(userId).catch(() => null));
     } catch (e) { setLoadError(e instanceof Error ? e.message : 'Could not load account details.'); }
-  }, [session?.user.id]);
+  }, [userId]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
   const chooseAvatar = async () => {
     if (!session?.user.id || photoBusy) return;
