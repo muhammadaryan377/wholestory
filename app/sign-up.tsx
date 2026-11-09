@@ -4,6 +4,7 @@ import { Screen, H1, P, Btn, Field } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { saveName } from '@/lib/api';
 import { SocialAuthButtons } from '@/components/social-auth-buttons';
+import { emailConfirmUrl } from '@/lib/email-confirmation';
 
 export default function SignUp() {
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [pw, setPw] = useState(''); const [busy, setBusy] = useState(false);
@@ -17,10 +18,10 @@ export default function SignUp() {
     }
     setBusy(true);
     try {
-      const { data, error } = await supabase.auth.signUp({ email: email.trim(), password: pw, options: { data: { name: name.trim() } } });
+      const { data, error } = await supabase.auth.signUp({ email: email.trim(), password: pw, options: { data: { name: name.trim() }, emailRedirectTo: emailConfirmUrl() } });
       if (error) throw error;
       if (!data.session) {
-        setMessage('Check your email for a confirmation link, then log in. If you already have an account, log in instead.');
+        router.replace({ pathname: '/check-email', params: { email: email.trim(), sent: '1' } });
         return;
       }
       await saveName(name.trim());
@@ -36,9 +37,9 @@ export default function SignUp() {
       <Field label="Your first name" value={name} onChangeText={setName} placeholder="e.g. Sam" autoComplete="given-name" />
       <Field label="Email address" value={email} onChangeText={setEmail} placeholder="you@example.com" autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
       <Field label="Create a password" value={pw} onChangeText={setPw} placeholder="At least 8 characters" secureTextEntry autoComplete="new-password" />
+      {message ? <P accessibilityRole="alert" style={{ marginBottom: 12 }}>{message}</P> : null}
       <Btn title="Create account" onPress={go} busy={busy} />
       <SocialAuthButtons onError={setMessage} />
-      {message ? <P accessibilityRole="alert">{message}</P> : null}
       <Btn title="Already have an account? Log in" kind="link" onPress={() => router.replace('/sign-in')} />
     </Screen>
   );

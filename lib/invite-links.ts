@@ -28,7 +28,7 @@ export function buildInviteUrl(code: string, baseUrl?: string): string {
 export function inviteMessage(title: string, url: string): string {
   const cleanTitle = title.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
   return [
-    "You're invited to add your side of a story on Whole Stories!",
+    "You're invited to add your side of a story on Whole Story!",
     '',
     cleanTitle ? '"' + cleanTitle + '"' : 'A shared story',
     '',
@@ -43,7 +43,7 @@ export function nativeInvitePath(code: string): string {
   return '/join/' + code;
 }
 
-/** Address for the "Open in the Whole Stories app" button shown on the web invitation page. */
+/** Address for the "Open in the Whole Story app" button shown on the web invitation page. */
 export function openInAppUrl(code: string): string {
   if (!validInviteCode(code)) throw new Error('The invitation code is invalid.');
   return INVITE_APP_SCHEME + '://join/' + code;

@@ -8,6 +8,7 @@ import { Screen, H1, P, Btn, Field, Card, Small } from '@/components/ui';
 import { Composer } from '@/components/media';
 import { addToStory, createStory, emptyDraft, type Draft } from '@/lib/api';
 import { C, F } from '@/lib/theme';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 
 /** Splits what was said into one part per photo, in order. */
 function pinToPhotos(words: string, count: number) {
@@ -23,6 +24,7 @@ export default function TellTheWholeStory() {
   const [title, setTitle] = useState('');
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [pinned, setPinned] = useState(false); const [busy, setBusy] = useState(false);
+  useUnsavedGuard(!busy && (draft.photos.length > 0 || !!draft.text.trim() || !!draft.audioUri));
   const words = (draft.transcript || draft.text).trim();
   const pin = () => {
     if (draft.recording || draft.processingAudio) return Alert.alert('Finish your recording first', 'Stop recording and wait for the words before continuing.');

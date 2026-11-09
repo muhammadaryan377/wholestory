@@ -14,7 +14,8 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_PAYMENTS_ENABLED": "false",
-        "EXPO_PUBLIC_TEST_AUTO_GUEST": "false"
+        "EXPO_PUBLIC_TEST_AUTO_GUEST": "false",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       },
       "environment": "preview"
     },

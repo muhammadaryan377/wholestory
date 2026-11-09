@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Universal Links (iOS) and App Links (Android) helper for Whole Stories invitations.
+ * Universal Links (iOS) and App Links (Android) helper for Whole Story invitations.
  *
  *   node scripts/invite-association.cjs generate   writes the two association files from real values
  *   node scripts/invite-association.cjs validate   checks the app config, the files and (optionally) the live website
@@ -39,7 +39,7 @@ function buildAasa({ teamId, bundleId }) {
   return {
     applinks: {
       apps: [],
-      details: [{ appIDs: [teamId + '.' + bundleId], components: [{ '/': JOIN_PATH, comment: 'Whole Stories story invitations' }] }],
+      details: [{ appIDs: [teamId + '.' + bundleId], components: [{ '/': JOIN_PATH, comment: 'Whole Story story invitations' }] }],
     },
   };
 }

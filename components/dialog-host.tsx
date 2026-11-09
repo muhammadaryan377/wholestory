@@ -12,7 +12,7 @@ function DialogContent({ dialog }: { dialog: Dialog }) {
   };
   return <Modal transparent visible animationType="fade" onRequestClose={close}>
     <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(0,0,0,0.4)' }}>
-      <ScrollView style={{ maxHeight: '85%', width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: C.cream, borderRadius: 16 }} contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flexGrow: 0, maxHeight: '85%', width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: C.cream, borderRadius: 16 }} contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
         <Text accessibilityRole="header" style={{ fontFamily: F.serif, color: C.navy, fontSize: 24, marginBottom: 10 }}>{dialog.title}</Text>
         {dialog.message ? <Text style={{ color: C.ink, fontFamily: F.sans, marginBottom: 12 }}>{dialog.message}</Text> : null}
         {dialog.input ? <TextInput accessibilityLabel={dialog.title} autoFocus value={value} onChangeText={setValue} secureTextEntry={dialog.input.secure} style={{ fontFamily: F.sans, fontSize: 15, color: C.ink, backgroundColor: C.card, padding: 12, borderWidth: 1, borderColor: C.line, borderRadius: 10, marginBottom: 12 }} /> : null}

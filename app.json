@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Whole Stories",
+    "name": "Whole Story",
     "slug": "wholestory",
     "version": "0.1.1",
     "orientation": "portrait",
@@ -15,13 +15,13 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Whole Stories lets you choose photos to add to your stories and event walls.",
-        "NSCameraUsageDescription": "Whole Stories lets you take a photo to add to a story.",
-        "NSMicrophoneUsageDescription": "Whole Stories records your voice when you tell a story.",
-        "NSFaceIDUsageDescription": "Whole Stories uses Face ID to open your private albums.",
-        "NSSpeechRecognitionUsageDescription": "Whole Stories turns your voice stories into words on your phone, so you can read and search them.",
-        "NSPhotoLibraryAddUsageDescription": "Whole Stories can save photos from your stories to your library.",
-        "NSLocationWhenInUseUsageDescription": "Whole Stories uses your location only when you choose to add your current place to a story."
+        "NSPhotoLibraryUsageDescription": "Whole Story lets you choose photos to add to your stories and event walls.",
+        "NSCameraUsageDescription": "Whole Story lets you take a photo to add to a story.",
+        "NSMicrophoneUsageDescription": "Whole Story records your voice when you tell a story.",
+        "NSFaceIDUsageDescription": "Whole Story uses Face ID to open your private albums.",
+        "NSSpeechRecognitionUsageDescription": "Whole Story turns your voice stories into words on your phone, so you can read and search them.",
+        "NSPhotoLibraryAddUsageDescription": "Whole Story can save photos from your stories to your library.",
+        "NSLocationWhenInUseUsageDescription": "Whole Story uses your location only when you choose to add your current place to a story."
       },
       "usesAppleSignIn": true
     },
@@ -57,25 +57,34 @@
     "plugins": [
       "expo-router",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false
+          }
+        }
+      ],
+      [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash-logo.png",
           "resizeMode": "contain",
-          "imageWidth": 240,
+          "imageWidth": 176,
           "backgroundColor": "#F8F3E8"
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Whole Stories lets you choose photos to add to your stories and event walls.",
-          "cameraPermission": "Whole Stories lets you take a photo to add to a story."
+          "photosPermission": "Whole Story lets you choose photos to add to your stories and event walls.",
+          "cameraPermission": "Whole Story lets you take a photo to add to a story."
         }
       ],
       [
         "expo-audio",
         {
-          "microphonePermission": "Whole Stories records your voice when you tell a story."
+          "microphonePermission": "Whole Story records your voice when you tell a story."
         }
       ],
       "expo-sharing",
@@ -84,14 +93,14 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Whole Stories uses Face ID to open your private albums."
+          "faceIDPermission": "Whole Story uses Face ID to open your private albums."
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "Whole Stories looks at your photo library on your phone to suggest stories from trips and days out. Nothing is uploaded unless you add it.",
-          "savePhotosPermission": "Whole Stories can save photos from your stories to your library.",
+          "photosPermission": "Whole Story looks at your photo library on your phone to suggest stories from trips and days out. Nothing is uploaded unless you add it.",
+          "savePhotosPermission": "Whole Story can save photos from your stories to your library.",
           "isAccessMediaLocationEnabled": true
         }
       ],
@@ -104,8 +113,8 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Whole Stories records your voice when you tell a story.",
-          "speechRecognitionPermission": "Whole Stories turns your voice stories into words on your phone, so you can read and search them."
+          "microphonePermission": "Whole Story records your voice when you tell a story.",
+          "speechRecognitionPermission": "Whole Story turns your voice stories into words on your phone, so you can read and search them."
         }
       ],
       "@sentry/react-native/expo",
@@ -114,7 +123,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow Whole Stories to attach your current location when you choose Add Location.",
+          "locationWhenInUsePermission": "Allow Whole Story to attach your current location when you choose Add Location.",
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false
         }
@@ -130,9 +139,9 @@
         }
       },
       "eas": {
-        "projectId": "bc585165-0b57-4ec6-94db-31cbf6319030"
+        "projectId": "5266ca09-ed49-4a5f-b460-9cfa60c0787e"
       }
     },
-    "owner": "sabirmughal"
+    "owner": "aryan12m"
   }
 }

@@ -56,15 +56,15 @@ export default function Join() {
     const stores = Platform.OS === 'web' ? appStoreLinks() : { ios: null, android: null };
     return <Screen>
       <H1>You’ve been invited</H1>
-      <P muted style={{ marginBottom: 15 }}>Log in or create an account to add your perspective to a shared Whole Stories memory. Your invitation is kept while you sign in.</P>
+      <P muted style={{ marginBottom: 15 }}>Log in or create an account to add your perspective to a shared Whole Story memory. Your invitation is kept while you sign in.</P>
       <Btn title="Log in to join" onPress={() => continueAuth('/sign-in')} />
       <Btn title="Create an account" kind="outline" onPress={() => continueAuth('/sign-up')} />
       {Platform.OS === 'web' ? <>
-        <Btn title="Open in the Whole Stories app" kind="link" onPress={() => Linking.openURL(openInAppUrl(code))} />
+        <Btn title="Open in the Whole Story app" kind="link" onPress={() => Linking.openURL(openInAppUrl(code))} />
         {stores.ios ? <Btn title="Download on the App Store" kind="link" onPress={() => Linking.openURL(stores.ios as string)} /> : null}
         {stores.android ? <Btn title="Get it on Google Play" kind="link" onPress={() => Linking.openURL(stores.android as string)} /> : null}
         {!stores.ios && !stores.android
-          ? <P muted style={{ marginTop: 8 }}>Don’t have the app yet? Install Whole Stories, then open this invitation link again.</P> : null}
+          ? <P muted style={{ marginTop: 8 }}>Don’t have the app yet? Install Whole Story, then open this invitation link again.</P> : null}
       </> : null}
       {saveError ? <P accessibilityRole="alert">{saveError}</P> : null}
     </Screen>;

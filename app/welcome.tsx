@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Animated, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type ImageSourcePropType, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +16,7 @@ const C = { ...theme, cream: '#FBF5ED', navy: '#061D3D', green: '#427D35', blue:
 // Bundled in assets/onboarding/. Replace a file (same name) with the designer's original to upgrade quality.
 const PHOTOS = {
   splash: require('../assets/onboarding/splash_glow_background.jpg'),
-  hero: require('../assets/onboarding/hero_couple_clean.png'),
+  hero: require('../assets/onboarding/hero_couple_clean.jpg'),
   dog: require('../assets/onboarding/photo_dog.jpg'),
   voice: require('../assets/onboarding/photo_voice.jpg'),
   greece: require('../assets/onboarding/timeline_greece.jpg'),
@@ -38,40 +39,94 @@ const DOT_SIZE = 8;
 const DOT_STEP = 16;
 const DOT_COUNT = TOTAL - 1; // the hero page has no progress dots
 const SPLASH_MS = 1850;
+const HERO_BROWN = '#2A1608';
+const HERO_SKY = '#A1CCFC'; // colour of the top edge of the photo, used to extend the sky above it
+const HERO_RATIO = 1200 / 1636; // width / height of hero_couple_clean.jpg
 
 const fmt = (ms: number) => {
   const s = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
-/** The Whole Stories "journey" line: a coloured curve with four milestone dots. */
-function DotsWave({ width = 235, height = 46 }: { width?: number; height?: number }) {
+/** The Whole Story "journey" line: a coloured curve with four milestone dots. */
+function DotsWave({ width = 235, height = 46, big = false }: { width?: number; height?: number; big?: boolean }) {
   const gradientId = `journey${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
-    <Svg width={width} height={height} viewBox="0 0 330 58">
+    <Svg width={width} height={height} viewBox={big ? '-5 -3 340 61' : '0 0 330 58'}>
       <Defs><LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
         <Stop offset="0" stopColor={C.amber} /><Stop offset="0.38" stopColor={C.blue} />
         <Stop offset="0.68" stopColor={C.dotGreen} /><Stop offset="1" stopColor={C.dotRed} />
       </LinearGradient></Defs>
-      <Path d="M12 39 C55 22 85 8 125 15 S205 51 242 42 S292 28 318 20" stroke={`url(#${gradientId})`} strokeWidth={2} fill="none" />
-      <Circle cx={12} cy={39} r={10} fill={C.amber} />
-      <Circle cx={125} cy={15} r={10} fill={C.blue} />
-      <Circle cx={212} cy={41} r={9} fill={C.dotGreen} />
-      <Circle cx={318} cy={20} r={10} fill={C.dotRed} />
+      <Path d="M12 39 C55 22 85 8 125 15 S205 51 242 42 S292 28 318 20" stroke={`url(#${gradientId})`} strokeWidth={big ? 3.2 : 2} fill="none" />
+      <Circle cx={12} cy={39} r={big ? 15 : 10} fill={C.amber} />
+      <Circle cx={125} cy={15} r={big ? 15 : 10} fill={C.blue} />
+      <Circle cx={212} cy={41} r={big ? 14 : 9} fill={C.dotGreen} />
+      <Circle cx={318} cy={20} r={big ? 15 : 10} fill={C.dotRed} />
     </Svg>
   );
 }
 
-function Photo({ source, height, radius = 0, zoom = 1, tag }: { source: ImageSourcePropType; height: number; radius?: number; zoom?: number; tag?: { text: string; color: string } }) {
+function Photo({ source, height, radius = 0, zoom = 1, tag, waves = false, focusY, boxWidth, ratio }: { source: ImageSourcePropType; height: number; radius?: number; zoom?: number; tag?: { text: string; color: string }; waves?: boolean; focusY?: number; boxWidth?: number; ratio?: number }) {
+  // focusY (0 = top, 1 = bottom) picks which part of a tall photo stays visible when the box is shorter than the photo.
+  // It needs the photo's width/height ratio and the box width.
+  const narrow = useWindowDimensions().width < 380;
+  const fullH = boxWidth && ratio ? boxWidth / ratio : 0;
+  const shifted = focusY !== undefined && fullH > height;
   return (
     <View style={{ width: '100%', height, borderRadius: radius, overflow: 'hidden', backgroundColor: C.line }}>
-      <Image source={source} resizeMode="cover" style={{ width: '100%', height: '100%', transform: [{ scale: zoom }] }} />
+      {shifted
+        ? <Image source={source} resizeMode="cover" style={{ position: 'absolute', left: 0, top: -(fullH - height) * (focusY ?? 0), width: boxWidth, height: fullH }} />
+        : <Image source={source} resizeMode="cover" style={{ width: '100%', height: '100%', transform: [{ scale: zoom }] }} />}
+      {waves ? <>
+        {/* Soft wavy edges, like torn paper: cream shapes laid over the top and bottom of the photo. */}
+        <Svg width="100%" height={26} viewBox="0 0 400 26" preserveAspectRatio="none" style={{ position: 'absolute', top: -1, left: 0, right: 0 }}>
+          <Path d="M0 0 H400 V5 C340 -1 270 14 200 13 C130 12 70 24 0 20 Z" fill={C.cream} />
+        </Svg>
+        <Svg width="100%" height={26} viewBox="0 0 400 26" preserveAspectRatio="none" style={{ position: 'absolute', bottom: -1, left: 0, right: 0 }}>
+          <Path d="M0 26 V5 C70 12 130 4 200 11 C270 18 340 20 400 12 V26 Z" fill={C.cream} />
+        </Svg>
+      </> : null}
       {tag ? (
-        <View style={styles.tag}>
-          <View style={[styles.tagDot, { backgroundColor: tag.color }]} />
-          <Text style={styles.tagText} numberOfLines={1}>{tag.text}</Text>
+        <View style={[styles.tag, narrow && { paddingHorizontal: 6, gap: 4 }]}>
+          <View style={[styles.tagDot, { backgroundColor: tag.color }, narrow && { width: 8, height: 8, borderRadius: 4 }]} />
+          <Text style={[styles.tagText, narrow && { fontSize: 9 }]} numberOfLines={1}>{tag.text}</Text>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+/** Full-width journey line that runs off both edges of the screen, with four milestone dots. */
+function JourneyBand({ width }: { width: number }) {
+  const gradientId = `band${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  return (
+    <Svg width={width} height={width * 150 / 856} viewBox="0 0 856 150" aria-hidden>
+      <Defs><LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
+        <Stop offset="0" stopColor={C.amber} /><Stop offset="0.4" stopColor={C.blue} />
+        <Stop offset="0.65" stopColor={C.dotGreen} /><Stop offset="1" stopColor={C.dotRed} />
+      </LinearGradient></Defs>
+      <Path d="M0 130 C70 108 110 78 150 68 C220 50 300 38 368 46 C430 54 470 84 517 86 C590 90 640 90 705 78 C770 64 820 36 856 14" stroke={`url(#${gradientId})`} strokeWidth={4} fill="none" />
+      <Circle cx={150} cy={68} r={20} fill={C.amber} />
+      <Circle cx={368} cy={46} r={20} fill={C.blue} />
+      <Circle cx={517} cy={86} r={20} fill={C.dotGreen} />
+      <Circle cx={705} cy={78} r={20} fill={C.dotRed} />
+    </Svg>
+  );
+}
+
+/** The coloured vertical line of the timeline: it shifts through the four journey colours. */
+function TimelineRail() {
+  const gradientId = `rail${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  return (
+    <View style={styles.rail} pointerEvents="none">
+      <Svg width={4} height="100%" preserveAspectRatio="none" aria-hidden>
+        <Defs><LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={C.amber} /><Stop offset="0.25" stopColor={C.dotGreen} />
+          <Stop offset="0.42" stopColor={C.blue} /><Stop offset="0.65" stopColor={C.dotRed} />
+          <Stop offset="0.82" stopColor={C.amber} /><Stop offset="1" stopColor={C.dotGreen} />
+        </LinearGradient></Defs>
+        <Rect x="0" y="0" width="4" height="100%" rx={2} fill={`url(#${gradientId})`} />
+      </Svg>
     </View>
   );
 }
@@ -86,11 +141,11 @@ function Action({ label, onPress, arrow = true, disabled = false }: { label: str
   );
 }
 
-function StoryCard({ title, date, source, height }: { title: string; date: string; source: ImageSourcePropType; height: number }) {
+function StoryCard({ title, date, source, focusTop }: { title: string; date: string; source: number; focusTop: string }) {
   return (
-    <View style={styles.storyCard}>
-      <View style={{ height, overflow: 'hidden', backgroundColor: C.line }}>
-        <Image source={source} resizeMode="cover" style={{ width: '100%', height: '100%', transform: [{ scale: 1.05 }] }} />
+    <View style={[styles.storyCard, { flex: 1 }]}>
+      <View style={{ flex: 1, overflow: 'hidden', backgroundColor: C.line }}>
+        <ExpoImage source={source} contentFit="cover" contentPosition={{ left: '50%', top: focusTop }} style={StyleSheet.absoluteFill} />
       </View>
       <View style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
         <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
@@ -151,7 +206,7 @@ function Pulse({ active }: { active: boolean }) {
 function Page({ i, width, height, scrollX, children }: { i: number; width: number; height: number; scrollX: Animated.Value; children: ReactNode }) {
   const opacity = scrollX.interpolate({ inputRange: [(i - 1) * width, i * width, (i + 1) * width], outputRange: [0.2, 1, 0.2], extrapolate: 'clamp' });
   return <Animated.View style={{ width, height, opacity }}>
-    <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled contentContainerStyle={{ flexGrow: 1, minHeight: i === 0 ? height : Math.max(height, 560) }}>
+    <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled contentContainerStyle={{ flexGrow: 1, minHeight: height }}>
       {children}
     </ScrollView>
   </Animated.View>;
@@ -160,9 +215,11 @@ function Page({ i, width, height, scrollX, children }: { i: number; width: numbe
 export default function Welcome() {
   const { session } = useAuth();
   const signedIn = !!session && !session.user.is_anonymous;
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const width = Math.min(windowWidth, 480);
   const insets = useSafeAreaInsets();
+  const heroTop = Math.round(windowHeight * 0.083); // the photo sits this far down so the logo has clear sky behind it
+  const heroFade = Math.min(1, (heroTop + width / HERO_RATIO) / Math.max(windowHeight, 1)); // where the photo ends, as a share of the screen height
   const scroll = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
   const [scrollX] = useState(() => new Animated.Value(0));
   const [splashOpacity] = useState(() => new Animated.Value(1));
@@ -178,9 +235,11 @@ export default function Welcome() {
   const voice = useIntroVoice();
   const { leave } = voice;
 
-  const pageH = Math.max(viewH, 560);
-  const compact = viewH > 0 && viewH < 560;
-  const photoH = Math.min(pageH * 0.53, 400);
+  const pageH = viewH || 560;
+  const compact = viewH > 0 && viewH < 540;
+  const dogH = compact ? pageH * 0.4 : Math.min(pageH * 0.6, 430);
+  const hs = compact ? { fontSize: width * 0.082, lineHeight: width * 0.09 } : { fontSize: width * 0.098, lineHeight: width * 0.108 }; // slide headlines scale with the screen
+  const ds = compact ? { fontSize: 14, lineHeight: 20, marginTop: 6, marginBottom: 8 } : null; // smaller body text on small phones
 
   const closeSplash = useCallback(() => {
     if (splashClosing.current) return;
@@ -261,6 +320,7 @@ export default function Welcome() {
 
   const heroOpacity = scrollX.interpolate({ inputRange: [0, width * 0.8], outputRange: [1, 0], extrapolate: 'clamp' });
   const brandOpacity = scrollX.interpolate({ inputRange: [0, width * 0.5], outputRange: [0, 1], extrapolate: 'clamp' });
+  const timelineWaveOpacity = scrollX.interpolate({ inputRange: [width * 1.4, width * 2, width * 2.6], outputRange: [0, 1, 0], extrapolate: 'clamp' });
   const dotsOpacity = scrollX.interpolate({ inputRange: [0, width * 0.6], outputRange: [0, 1], extrapolate: 'clamp' });
   const loginOpacity = scrollX.interpolate({ inputRange: [0, width * 0.6], outputRange: [1, 0], extrapolate: 'clamp' });
   const pillX = scrollX.interpolate({ inputRange: [width, width * (TOTAL - 1)], outputRange: [0, DOT_STEP * (DOT_COUNT - 1)], extrapolate: 'clamp' });
@@ -276,15 +336,28 @@ export default function Welcome() {
     <View style={styles.stage}>
     <View style={[styles.root, { width, paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 12) }]}>
       {/* Full-bleed hero behind the first page; it fades away as you swipe on. */}
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: heroOpacity }]}>
-        <Image source={PHOTOS.hero} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} />
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: heroOpacity, backgroundColor: HERO_SKY }]}>
+        {/* The photo keeps its own proportions from the top; the brown fade below it carries the white text. */}
+        <Image source={PHOTOS.hero} resizeMode="cover" style={{ position: 'absolute', top: heroTop, left: 0, width, height: width / HERO_RATIO }} />
+        <Svg width="100%" height={heroTop + 56} preserveAspectRatio="none" style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
+          <Defs>
+            <LinearGradient id="heroSky" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={HERO_SKY} stopOpacity={1} />
+              <Stop offset={heroTop / (heroTop + 56)} stopColor={HERO_SKY} stopOpacity={1} />
+              <Stop offset="1" stopColor={HERO_SKY} stopOpacity={0} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#heroSky)" />
+        </Svg>
         <Svg width="100%" height="100%" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
           <Defs>
             <LinearGradient id="heroShade" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor="#271407" stopOpacity={0} />
-              <Stop offset="0.38" stopColor="#0B1B22" stopOpacity={0} />
-              <Stop offset="0.6" stopColor="#271407" stopOpacity={0.22} />
-              <Stop offset="1" stopColor="#271407" stopOpacity={0.9} />
+              <Stop offset="0" stopColor={HERO_BROWN} stopOpacity={0} />
+              <Stop offset={heroFade * 0.42} stopColor={HERO_BROWN} stopOpacity={0} />
+              <Stop offset={heroFade * 0.72} stopColor={HERO_BROWN} stopOpacity={0.3} />
+              <Stop offset={heroFade * 0.97} stopColor={HERO_BROWN} stopOpacity={0.9} />
+              <Stop offset={Math.min(1, heroFade * 0.97 + 0.04)} stopColor={HERO_BROWN} stopOpacity={1} />
+              <Stop offset="1" stopColor={HERO_BROWN} stopOpacity={1} />
             </LinearGradient>
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#heroShade)" />
@@ -292,7 +365,10 @@ export default function Welcome() {
       </Animated.View>
 
       <View style={styles.header}>
-        <Animated.Text style={[styles.brand, { opacity: brandOpacity }]} accessibilityRole="header">Whole Stories</Animated.Text>
+        <Animated.Text style={[styles.brand, { opacity: brandOpacity }]} accessibilityRole="header">Whole Story</Animated.Text>
+        <Animated.View pointerEvents="none" style={{ position: 'absolute', right: 62, top: 6, opacity: timelineWaveOpacity }}>
+          <DotsWave width={width * 0.27} height={width * 0.27 * 58 / 330} />
+        </Animated.View>
         <Pressable accessibilityRole="button" accessibilityLabel="Skip introduction"
           onPress={() => void finish()} disabled={navigating} hitSlop={16}>
           <Text style={styles.skip}>Skip</Text>
@@ -307,41 +383,44 @@ export default function Welcome() {
         keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
         {page(0, (
           <View style={{ flex: 1, paddingHorizontal: PX, justifyContent: 'space-between', paddingBottom: 8 }}>
-            <View style={{ alignItems: 'center', marginTop: 0 }}>
-              <Text accessibilityRole="header" style={[styles.heroBrand, { fontSize: width * (compact ? 0.12 : 0.145), lineHeight: width * (compact ? 0.115 : 0.139) }]}>{'Whole\nStories'}</Text>
-              <DotsWave width={width * 0.67} height={46} />
+            <View style={{ alignItems: 'center', marginTop: 6 }}>
+              <Text accessibilityRole="header" style={[styles.heroBrand, { fontSize: width * (compact ? 0.09 : 0.105), lineHeight: width * (compact ? 0.1 : 0.115) }]}>Whole Story</Text>
+              <DotsWave big width={width * 0.46} height={width * 0.46 * 61 / 340} />
             </View>
             <View>
-              <Text style={[styles.heroTitle, { fontSize: width * (compact ? 0.088 : 0.108), lineHeight: width * (compact ? 0.095 : 0.115) }]}>{'A moment.\nA snapshot.\nA memory.'}</Text>
-              <Text style={[styles.heroBody, compact && { fontSize: 16, lineHeight: 23 }]}>{'Capture your story and\nwatch it grow.'}</Text>
+              <Text style={[styles.heroTitle, { fontSize: width * (compact ? 0.075 : 0.088), lineHeight: width * (compact ? 0.082 : 0.096) }]}>{'A moment.\nA snapshot.\nA memory.'}</Text>
+              <Text style={[styles.heroBody, compact && { fontSize: 15, lineHeight: 21 }]}>{'Capture your story and\nwatch it grow.'}</Text>
             </View>
           </View>
         ))}
 
         {page(1, <>
-          <Photo source={PHOTOS.dog} height={photoH} />
-          <View style={{ flex: 1, paddingHorizontal: PX, justifyContent: 'center' }}>
-            <Text style={styles.headline}>{'Your photos\nshow a moment.'}</Text>
-            <Text style={styles.description}>Whole Stories keeps the memories, voices and moments behind them.</Text>
-            <View style={{ alignItems: 'center', marginTop: 4 }}><DotsWave width={Math.min(width - PX * 2, 320)} height={compact ? 36 : 46} /></View>
+          <Photo source={PHOTOS.dog} height={dogH} waves />
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <View style={{ paddingHorizontal: PX }}>
+              <Text style={[styles.headline, hs, { marginTop: 10 }]}>{'Your photos\nshow a moment.'}</Text>
+              <Text style={[styles.description, ds]}>Whole Story keeps the memories, voices and moments behind them.</Text>
+            </View>
+            <JourneyBand width={width} />
           </View>
         </>)}
 
         {page(2, (
           <View style={{ flex: 1, paddingHorizontal: PX }}>
-            <View style={{ alignItems: 'flex-end', marginRight: -10 }}><DotsWave width={Math.min(width - 50, 280)} height={compact ? 26 : 33} /></View>
-            <Text style={[styles.headline, { marginTop: 4 }]}>{'A story doesn’t end\nwith one photo.'}</Text>
-            <Text style={styles.description}>Add new moments and watch your story grow.</Text>
-            <View style={{ flex: 1, paddingLeft: 30, justifyContent: 'space-evenly' }}>
-              <View style={styles.rail} />
+            <Text style={[styles.headline, hs, { marginTop: 10 }]}>{'A story doesn’t end\nwith one photo.'}</Text>
+            <Text style={[styles.description, ds]}>Add new moments and watch your story grow.</Text>
+            <View style={{ flex: 1, paddingLeft: 30, paddingVertical: 4, gap: compact ? 8 : 12, justifyContent: 'space-evenly' }}>
+              <TimelineRail />
+              <View style={[styles.railDot, { backgroundColor: C.dotGreen, left: 0, top: 'auto', bottom: 0 }]} />
               {[
-                { title: 'Holiday in Greece', date: 'Tue 12 Jul 2022', source: PHOTOS.greece, dot: C.amber },
-                { title: 'Dinner with the crew', date: 'Sat 20 Aug 2022', source: PHOTOS.dinner, dot: C.blue },
-                { title: 'Our engagement', date: 'Sun 14 Apr 2024', source: PHOTOS.engagement, dot: C.dotRed },
+                { title: 'Holiday in Greece', date: 'Tue 12 Jul 2022', source: PHOTOS.greece, dot: C.amber, focusTop: '35%' },
+                { title: 'Dinner with the crew', date: 'Sat 20 Aug 2022', source: PHOTOS.dinner, dot: C.blue, focusTop: '35%' },
+                { title: 'Our engagement', date: 'Sun 14 Apr 2024', source: PHOTOS.engagement, dot: C.dotRed, focusTop: '0%' },
               ].map(story => (
-                <View key={story.title}>
+                // The photos are very wide, so the cards share all the height the page has left.
+                <View key={story.title} style={styles.timelineItem}>
                   <View style={[styles.railDot, { backgroundColor: story.dot }]} />
-                  <StoryCard title={story.title} date={story.date} source={story.source} height={Math.min(90, Math.max(58, pageH * 0.12))} />
+                  <StoryCard title={story.title} date={story.date} source={story.source} focusTop={story.focusTop} />
                 </View>
               ))}
             </View>
@@ -350,10 +429,10 @@ export default function Welcome() {
 
         {page(VOICE_PAGE, <>
           {compact ? null : <View style={{ alignItems: 'center', marginBottom: 6 }}><DotsWave width={Math.min(width - 60, 290)} height={30} /></View>}
-          <Photo source={PHOTOS.voice} height={Math.min(pageH * 0.39, 285)} />
+          <Photo source={PHOTOS.voice} height={compact ? pageH * 0.3 : Math.min(pageH * 0.39, 285)} waves focusY={0.15} boxWidth={width} ratio={1020 / 840} />
           <View style={{ flex: 1, paddingHorizontal: PX, justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={[styles.headline, { textAlign: 'center', marginTop: 8 }]}>{'Tell us why\nit mattered.'}</Text>
-            <Text style={[styles.description, { textAlign: 'center' }]}>
+            <Text style={[styles.headline, hs, { textAlign: 'center', marginTop: 8 }]}>{'Tell us why\nit mattered.'}</Text>
+            <Text style={[styles.description, ds, { textAlign: 'center' }]}>
               {rec ? 'Listening… tell us about a photo you love.'
                 : recorded ? 'Lovely. Play it back, or record it again.'
                 : 'Just tap and talk. Your memories, in your own words.'}
@@ -384,24 +463,24 @@ export default function Welcome() {
 
         {page(4, (
           <View style={{ flex: 1, paddingHorizontal: PX }}>
-            <View style={{ alignItems: 'flex-end' }}><DotsWave width={width * 0.7} height={42} /></View>
-            <Text style={[styles.headline, { marginTop: compact ? 4 : 14 }]}>{'More than your\nperspective.'}</Text>
-            <Text style={styles.description}>Invite the people who were there to add their photos and stories too.</Text>
+            <View style={{ alignItems: 'flex-end' }}><DotsWave width={width * 0.7} height={compact ? 30 : 42} /></View>
+            <Text style={[styles.headline, hs, { marginTop: compact ? 4 : 14 }]}>{'More than your\nperspective.'}</Text>
+            <Text style={[styles.description, ds]}>Invite the people who were there to add their photos and stories too.</Text>
             <View style={{ flex: 1, flexDirection: 'row', gap: 12, marginBottom: 8 }}>
               <View style={{ flex: 1, gap: 12 }}>
-                <Photo source={PHOTOS.friends} radius={15} zoom={1.05} tag={{ text: 'Sarah added 5 photos', color: C.amber }} height={Math.min(pageH * 0.27, 150)} />
-                <Photo source={PHOTOS.outdoors} radius={15} zoom={1.05} tag={{ text: 'Aisha added a video', color: C.dotGreen }} height={Math.min(pageH * 0.3, 170)} />
+                <Photo source={PHOTOS.friends} radius={15} zoom={1.05} tag={{ text: 'Sarah added 5 photos', color: C.amber }} height={compact ? pageH * 0.23 : Math.min(pageH * 0.27, 190)} />
+                <Photo source={PHOTOS.outdoors} radius={15} zoom={1.05} tag={{ text: 'Aisha added a video', color: C.dotGreen }} height={compact ? pageH * 0.27 : Math.min(pageH * 0.3, 215)} />
               </View>
               <View style={{ flex: 1, gap: 12, marginTop: 14 }}>
-                <Photo source={PHOTOS.mountains} radius={15} zoom={1.05} tag={{ text: 'Bilal’s story', color: C.blue }} height={Math.min(pageH * 0.3, 170)} />
-                <Photo source={PHOTOS.party} radius={15} zoom={1.05} tag={{ text: 'Sameer’s note', color: C.dotRed }} height={Math.min(pageH * 0.27, 150)} />
+                <Photo source={PHOTOS.mountains} radius={15} zoom={1.05} tag={{ text: 'Bilal’s story', color: C.blue }} height={compact ? pageH * 0.27 : Math.min(pageH * 0.3, 215)} />
+                <Photo source={PHOTOS.party} radius={15} zoom={1.05} tag={{ text: 'Sameer’s note', color: C.dotRed }} height={compact ? pageH * 0.23 : Math.min(pageH * 0.27, 190)} />
               </View>
             </View>
           </View>
         ))}
       </Animated.ScrollView>
 
-      <View style={{ paddingHorizontal: PX, gap: 12, paddingTop: 12 }}>
+      <View style={{ paddingHorizontal: PX, gap: compact ? 8 : 12, paddingTop: compact ? 6 : 12 }}>
         <Animated.View style={[styles.dots, { opacity: dotsOpacity }]} pointerEvents={index === 0 ? 'none' : 'auto'}>
           {Array.from({ length: DOT_COUNT }, (_, i) => (
             <Pressable key={i} accessibilityRole="button" accessibilityLabel={`Go to introduction page ${i + 1} of ${DOT_COUNT}`}
@@ -418,20 +497,15 @@ export default function Welcome() {
         {index > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => go(index - 1)} disabled={navigating} hitSlop={8} style={{ alignSelf: 'center', paddingVertical: 3 }}><Text style={styles.back}>Back</Text></Pressable> : null}
       </View>
 
-      {/* Splash: soft glow background with the Whole Stories logo, then fades into the hero. */}
+      {/* Splash: soft glow background with the Whole Story logo, then fades into the hero. */}
       {splashDone ? null : (
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: splashOpacity, zIndex: 20 }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeSplash} accessibilityRole="button" accessibilityLabel="Whole Stories. Tap to continue">
+        // Opaque, because the hero underneath would otherwise show through until the glow image has loaded.
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: splashOpacity, zIndex: 20, backgroundColor: theme.cream }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSplash} accessibilityRole="button" accessibilityLabel="Whole Story. Tap to continue">
             <Image source={PHOTOS.splash} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} />
-            <Svg width="100%" height="100%" viewBox="0 0 400 850" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
-              <Path d="M-30 70 C70 340 220 250 435 405 M-40 505 C140 580 250 700 440 795 M-15 750 Q230 530 440 750" fill="none" stroke="white" strokeWidth={10} opacity={0.15} />
-              <Path d="M-30 70 C70 340 220 250 435 405 M-40 505 C140 580 250 700 440 795 M-15 750 Q230 530 440 750" fill="none" stroke="white" strokeWidth={2.3} opacity={0.8} />
-              <Circle cx={90} cy={170} r={28} fill="#FFFBE7" opacity={0.5} /><Circle cx={73} cy={280} r={18} fill="#FFFADE" opacity={0.65} />
-              <Circle cx={111} cy={650} r={30} fill="#FFFBE7" opacity={0.45} />
-            </Svg>
             <View style={styles.splashCenter}>
-              <Text style={[styles.splashLogo, { fontSize: width * 0.19, lineHeight: width * 0.182 }]}>{'Whole\nStories'}</Text>
-              <DotsWave width={Math.min(width * 0.68, 260)} height={46} />
+              <Text style={[styles.splashLogo, { fontSize: width * 0.17, lineHeight: width * 0.14 }]}>{'Whole\nStories'}</Text>
+              <DotsWave big width={width * 0.57} height={width * 0.102} />
             </View>
           </Pressable>
         </Animated.View>
@@ -449,12 +523,13 @@ const styles = StyleSheet.create({
   skip: { color: C.navy, fontFamily: F.sansMedium, fontSize: 14 },
   heroBrand: { fontFamily: F.serif, color: C.navy, textAlign: 'center', letterSpacing: -1.5, marginBottom: 8 },
   heroTitle: { fontFamily: F.serif, color: C.white, letterSpacing: -0.5, marginBottom: 10 },
-  heroBody: { fontFamily: F.sans, color: C.white, fontSize: 19, lineHeight: 28, marginBottom: 12 },
+  heroBody: { fontFamily: F.sans, color: C.white, fontSize: 17, lineHeight: 24, marginBottom: 12 },
   headline: { fontFamily: F.serif, fontSize: 34, lineHeight: 39, color: C.navy, marginTop: 18, letterSpacing: -0.6 },
   description: { color: C.navy, fontSize: 16, lineHeight: 24, fontFamily: F.sans, marginTop: 10, marginBottom: 16 },
-  rail: { position: 'absolute', left: 8, top: 14, bottom: 14, width: 2, backgroundColor: '#A9BFAC' },
+  rail: { position: 'absolute', left: 6, top: 14, bottom: 8, width: 4 },
   railDot: { position: 'absolute', left: -30, top: 22, width: 16, height: 16, borderRadius: 8, zIndex: 1 },
-  storyCard: { overflow: 'hidden', borderRadius: 13, backgroundColor: C.card, shadowColor: '#323031', shadowOpacity: 0.12, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  timelineItem: { flex: 1, minHeight: 96, maxHeight: 170 },
+  storyCard: { overflow: 'hidden', borderRadius: 16, backgroundColor: C.card, shadowColor: '#323031', shadowOpacity: 0.12, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   cardTitle: { fontFamily: F.serif, fontSize: 15, color: C.navy },
   cardDate: { fontFamily: F.sans, color: C.grey, fontSize: 10, marginTop: 1 },
   tag: { position: 'absolute', left: 7, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '92%', backgroundColor: C.white, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 9 },
@@ -474,6 +549,6 @@ const styles = StyleSheet.create({
   loginText: { color: C.white, fontFamily: F.sans, fontSize: 13 },
   loginLink: { textDecorationLine: 'underline', fontFamily: F.sansBold },
   back: { color: C.navy, fontFamily: F.sansMedium, fontSize: 13 },
-  splashCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 30 },
-  splashLogo: { fontFamily: F.serif, color: C.navy, textAlign: 'center', letterSpacing: -2.5, marginBottom: 14 },
+  splashCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  splashLogo: { fontFamily: F.serif, color: C.navy, textAlign: 'center', letterSpacing: -1.5, marginBottom: 12 },
 });

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Alert } from '@/lib/alert';
 import { useFocusEffect } from 'expo-router';
-import { LoadError, Screen, H1, H2, P, ToggleRow, Loading, Small, Field, Btn } from '@/components/ui';
+import { LoadError, Screen, H1, H2, P, ToggleRow, Loading, Small, Field, Btn, runAction } from '@/components/ui';
 import { addSkipDate, deleteSkipDate, listPeople, listSkipDates, listStories, me, setPersonHidden, updateStory, type Person, type SkipDate, type Story } from '@/lib/api';
 import { C, F } from '@/lib/theme';
 import { validMonthDay } from '@/lib/dates';
@@ -35,7 +35,7 @@ export default function HardMemories() {
       {dates.map(x => (
         <View key={x.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.line, padding: 12, marginBottom: 8 }}>
           <Text style={{ flex: 1, fontFamily: F.sansBold, color: C.ink }}>{x.day} {MONTHS[x.month - 1]}{x.label ? <Text style={{ fontFamily: F.sans, color: C.grey }}> · {x.label}</Text> : null}</Text>
-          <Pressable onPress={async () => { await deleteSkipDate(x.id); load(); }} hitSlop={8}><Text style={{ color: C.red }}>Remove</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={'Remove ' + x.day + ' ' + MONTHS[x.month - 1]} onPress={() => runAction(async () => { await deleteSkipDate(x.id); await load(); })} hitSlop={8}><Text style={{ color: C.red }}>Remove</Text></Pressable>
         </View>
       ))}
       <View style={{ flexDirection: 'row', gap: 8 }}>

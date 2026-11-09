@@ -55,6 +55,10 @@ The coding session did not modify the live database or send recovery emails.
    when testing there. For the installed app add `wholestory://reset-password`.
    Expo Go uses a different generated URL; use a development build for reliable
    device email-link testing. Keep hosted production URLs on HTTPS.
+   Sign-up confirmation emails return to `/auth/confirm`, so also allow
+   `http://localhost:8081/auth/confirm`, `wholestory://auth/confirm` and the
+   hosted `https://YOUR_WEB_HOST/auth/confirm`. Supabase sends unlisted redirects
+   to the Site URL instead, and the confirmation screen will not open.
 4. The default Supabase recovery email should use its generated ConfirmationURL.
    A custom email must retain the redirect/recovery parameters. Verify email
    delivery/rate limits in Auth logs if no message arrives.

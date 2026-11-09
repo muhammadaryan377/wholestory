@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { Btn, Small } from './ui';
+import { Small } from './ui';
+import { SocialButton } from './social-button';
+import { GoogleLogo } from './brand-logos';
 import { AppleSignInButton } from './apple-sign-in-button';
 import { signInWithSocialProvider, type SocialProvider } from '@/lib/social-auth';
 
@@ -27,7 +29,7 @@ export function SocialAuthButtons({ onError }: { onError: (message: string) => v
         Or continue securely with
       </Small>
       <AppleSignInButton onPress={() => void login('apple')} busy={working === 'apple'} disabled={!!working} />
-      <Btn title="Continue with Google" kind="outline" onPress={() => void login('google')} busy={working === 'google'} disabled={!!working} />
+      <SocialButton title="Continue with Google" logo={<GoogleLogo size={20} />} onPress={() => void login('google')} busy={working === 'google'} disabled={!!working} />
     </>
   );
 }

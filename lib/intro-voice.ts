@@ -26,7 +26,7 @@ export function useIntroVoice() {
     try {
       const perm = await AudioModule.requestRecordingPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert('Microphone not allowed', 'You can allow the microphone for Whole Stories in your phone Settings.');
+        Alert.alert('Microphone not allowed', 'You can allow the microphone for Whole Story in your phone Settings.');
         return;
       }
       player.pause();

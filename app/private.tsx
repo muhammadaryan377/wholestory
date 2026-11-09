@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Alert } from '@/lib/alert';
 import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -114,6 +114,7 @@ export default function Private() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not reset passcode.'); }
     finally { setResetBusy(false); }
   };
+  if (Platform.OS === 'web') return <Screen><Empty title="Private albums are in the app" body="Your passcode stays on your phone, so private stories can only be opened in the iPhone or Android app." /></Screen>;
   if (saved === undefined || loadedFor !== key) return <Screen>{secureError ? <><H1>Private albums unavailable</H1><P accessibilityRole="alert">{secureError}</P><Btn title="Retry securely" kind="outline" onPress={() => { setSecureError(''); setLoadedFor(null); setLoadAttempt(n => n + 1); }} /></> : <P>Loading private albums…</P>}</Screen>;
   if (!open) return (
     <Screen>
@@ -121,7 +122,7 @@ export default function Private() {
       <P muted style={{ textAlign: 'center' }}>{saved ? 'Enter your passcode' : first ? 'Enter the same passcode again' : 'Choose a 6-digit passcode for your private albums. It stays on this phone.'}</P>
       <Dots n={entry.length} />
       <Keypad onDigit={digit} onBack={() => writeEntry(entryRef.current.slice(0, -1))} onClear={() => writeEntry('')} />
-      {saved ? <Btn kind="link" title="Use Face ID" onPress={faceId} /> : null}
+      {saved ? <Btn kind="link" title={Platform.OS === 'ios' ? 'Use Face ID' : 'Use fingerprint'} onPress={faceId} /> : null}
       {saved ? <Btn kind="link" title="Forgot your passcode?" onPress={() => Alert.alert('Reset passcode?', 'Your private stories stay safe. You will choose a new passcode after logging in again.', [
         { text: 'Cancel', style: 'cancel' }, { text: 'Reset', style: 'destructive', onPress: () => setResetting(true) }])} /> : null}
       {resetting ? <>
@@ -142,7 +143,7 @@ export default function Private() {
       {stories.map(s => (
         <Card key={s.id} onPress={() => router.push(`/story/${s.id}`)} style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
           {s.cover ? <Photo path={s.cover} size={64} /> : <View style={{ width: 64, height: 64, borderRadius: 10, backgroundColor: '#E9E4D9' }} />}
-          <View style={{ flex: 1 }}><Text style={{ fontFamily: F.serif, fontSize: 17, color: C.navy }}>{s.title}</Text><Small>{s.entryCount ?? 0} moments · 🔒 Private</Small></View>
+          <View style={{ flex: 1 }}><Text style={{ fontFamily: F.serif, fontSize: 17, color: C.navy }}>{s.title}</Text><Small>{s.entryCount ?? 0} {s.entryCount === 1 ? 'chapter' : 'chapters'} · Private</Small></View>
         </Card>
       ))}
     </Screen>

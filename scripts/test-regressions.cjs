@@ -62,6 +62,17 @@ test('recovery links accept recovery sessions, PKCE and recovery OTP; reject nor
   assert.throws(() => recoveryParams('https://app.test/reset-password#error=access_denied&error_description=Expired'), /Expired/);
 });
 
+test('sign-up confirmation links accept PKCE, resent-email tokens and OTP; report expired or recovery links', () => {
+  const { signupLinkParams } = load('lib/auth-links.ts');
+  assert.equal(signupLinkParams('https://app.test/auth/confirm?code=abc').kind, 'code');
+  assert.equal(signupLinkParams('wholestory://auth/confirm#access_token=a&refresh_token=r&type=signup').kind, 'session');
+  assert.equal(signupLinkParams('https://app.test/auth/confirm?token_hash=abc&type=email').kind, 'otp');
+  const expired = signupLinkParams('https://app.test/auth/confirm#error=access_denied&error_description=Link+expired');
+  assert.deepEqual({ kind: expired.kind, message: expired.message }, { kind: 'error', message: 'Link expired' });
+  assert.equal(signupLinkParams('https://app.test/auth/confirm#access_token=a&refresh_token=r&type=recovery').kind, 'error');
+  assert.equal(signupLinkParams('https://app.test/auth/confirm').kind, 'error');
+});
+
 test('calendar dates keep their day in western time zones and reject impossible input', () => {
   const previous = process.env.TZ;
   process.env.TZ = 'America/Los_Angeles';
@@ -275,13 +286,150 @@ test('story categories and map locations are stored per account with explicit us
   await assert.rejects(prefs.saveStoryPreference('first', id, { category: 'Machine guessed it' }), /Invalid category/);
 });
 
-test('iOS presentation uses the approved Whole Stories name and packaged fonts', () => {
+test('connection and missing-record errors are shown in plain words', () => {
+  const { friendlyMessage } = load('lib/alert.ts', { 'react-native': { Alert: {}, Platform: { OS: 'android' } } });
+  assert.match(friendlyMessage('TypeError: Network request failed'), /internet connection/);
+  assert.match(friendlyMessage('Failed to fetch'), /internet connection/);
+  assert.match(friendlyMessage('Cannot coerce the result to a single JSON object'), /no longer available/);
+  assert.equal(friendlyMessage('Name your event'), 'Name your event');
+  assert.equal(friendlyMessage(undefined), 'Please try again.');
+});
+
+test('finished onboarding follows the account to a new phone and does not skip it for new accounts', async () => {
+  const cache = new Map();
+  let metadata = {};
+  const updates = [];
+  const supabase = { auth: {
+    getSession: async () => ({ data: { session: { user: { id: 'user', user_metadata: metadata } } } }),
+    updateUser: async patch => { updates.push(patch); metadata = { ...metadata, ...patch.data }; return { data: {}, error: null }; },
+  } };
+  const groups = load('lib/moment-groups.ts', {
+    '@react-native-async-storage/async-storage': { __esModule: true, default: { getItem: async key => cache.get(key) ?? null, setItem: async (key, value) => { cache.set(key, value); } } },
+    './supabase': { supabase },
+  });
+  assert.equal(await groups.isSetupComplete('user'), false);
+  await groups.markSetupComplete('user');
+  assert.equal(updates[0].data.setup_complete, true);
+  cache.clear(); // a new phone or a reinstall
+  assert.equal(await groups.isSetupComplete('user'), true);
+  assert.equal(cache.get('ws_onboarded_user'), '1');
+  cache.clear();
+  assert.equal(await groups.isSetupComplete('someone-else'), false);
+});
+
+test('a photo already resolved needs no more requests, and a private one stays locked', async () => {
+  let queries = 0, unlocked = true;
+  class PrivateLockedError extends Error {}
+  const row = isPrivate => ({ eq: () => ({ maybeSingle: async () => { queries++; return { data: { entries: { stories: { private: isPrivate } } }, error: null }; } }) });
+  const privatePaths = new Set(['private.jpg']);
+  let current = '';
+  const supabase = {
+    from: () => ({ select: () => row(privatePaths.has(current)) }),
+    storage: { from: () => ({ createSignedUrl: async path => ({ data: { signedUrl: 'https://signed/' + path }, error: null }) }) },
+  };
+  const media = load('lib/media.ts', {
+    'expo-file-system': { File: class {} }, 'react-native': { Platform: { OS: 'android' } },
+    'expo-image-manipulator': { ImageManipulator: {}, SaveFormat: {} }, './supabase': { supabase },
+    './private-access': { privateIsUnlocked: () => unlocked, PrivateLockedError },
+  });
+  current = 'open.jpg';
+  assert.equal(await media.viewUrl('open.jpg'), 'https://signed/open.jpg');
+  assert.equal(await media.viewUrl('open.jpg'), 'https://signed/open.jpg');
+  assert.equal(queries, 1);
+  current = 'private.jpg';
+  assert.equal(await media.viewUrl('private.jpg'), 'https://signed/private.jpg');
+  unlocked = false;
+  await assert.rejects(media.viewUrl('private.jpg'), PrivateLockedError);
+});
+
+test('deleting an account clears only that account from this phone', async () => {
+  const uid = '00000000-0000-4000-8000-000000000003';
+  const cache = new Map([['ws_story_preferences_v1_' + uid, '{}'], ['ws_onboarded_' + uid, '1'], ['ws_place_names_v1', '{}'], ['ws_story_preferences_v1_other', '{}'], ['ws_intro_seen_v1', '1']]);
+  const removedPhoto = [], removedSecret = [];
+  const { clearLocalAccountData } = load('lib/account-data.ts', {
+    '@react-native-async-storage/async-storage': { __esModule: true, default: { getAllKeys: async () => [...cache.keys()], multiRemove: async keys => keys.forEach(key => cache.delete(key)) } },
+    'expo-secure-store': { deleteItemAsync: async key => { removedSecret.push(key); throw new Error('not on web'); } },
+    './profile-photo': { removeLocalProfilePhoto: async id => { removedPhoto.push(id); } },
+  });
+  await clearLocalAccountData(uid);
+  assert.deepEqual(removedPhoto, [uid]);
+  assert.deepEqual(removedSecret, ['ws_private_passcode_' + uid]);
+  assert.deepEqual([...cache.keys()].sort(), ['ws_intro_seen_v1', 'ws_story_preferences_v1_other']);
+});
+
+test('story rows, threads, map groups and the grown card are built from real story data', () => {
+  const display = load('lib/story-display.ts');
+  const story = (id, extra) => ({ id, title: id, story_date: '2025-09-15', entryCount: 1, photoCount: 2, cover: id + '.jpg', ...extra });
+
+  assert.equal(display.storyMeta(story('a', { entryCount: 3, photoCount: 0, takenDates: ['2021-01-02T10:00:00Z', '1970-01-01T00:00:00Z'] })), '3 chapters · 2021 - 2025');
+  assert.match(display.storyMeta(story('a', { photoCount: 120 })), /^1 chapter · 15 Sept? 2025 · 120 photos$/);
+
+  assert.deepEqual(Array.from(display.buildThreads([]), t => t.key), []);
+  const threads = display.buildThreads([story('a', { category: 'Family', entryCount: 2, photoCount: 5 }), story('b')]);
+  assert.deepEqual(Array.from(threads, t => t.key), ['All', 'Family']);
+  assert.equal(threads[1].sub, '2 chapters · 5 photos');
+
+  const nearby = [story('a', { lat: 41.9, lng: 12.5 }), story('b', { lat: 41.91, lng: 12.51 }), story('far', { lat: 45.4, lng: 12.3 }), story('nowhere')];
+  const wide = display.clusterStories(nearby, { latitudeDelta: 10, longitudeDelta: 10 });
+  assert.equal(wide.length, 2);
+  assert.equal(wide[0].photos, 4);
+  assert.equal(display.clusterStories(nearby, { latitudeDelta: 0.01, longitudeDelta: 0.01 }).length, 3);
+
+  const now = Date.parse('2026-11-09T12:00:00Z');
+  const added = (author, created_at, photos, voice = false) => ({ author, created_at, photos, voice });
+  const grown = story('Italy', { activity: [added('other', '2026-11-08T00:00:00Z', 3), added('other', '2026-11-09T00:00:00Z', 0, true), added('me', '2026-11-09T01:00:00Z', 9)] });
+  assert.equal(display.findStoryGrowth([grown], 'me', {}, now).message, '3 new photos and a voice story were added to Italy');
+  assert.equal(display.findStoryGrowth([grown], 'me', { Italy: '2026-11-09T00:00:00Z' }, now), null);
+  assert.equal(display.findStoryGrowth([story('old', { activity: [added('other', '2026-01-01T00:00:00Z', 1)] })], 'me', {}, now), null);
+  assert.equal(display.findStoryGrowth([story('own', { activity: [added('me', '2026-11-09T00:00:00Z', 1)] })], 'me', {}, now), null);
+  assert.equal(display.findStoryGrowth([story('one', { activity: [added('other', '2026-11-09T00:00:00Z', 1)] })], 'me', {}, now).message, '1 new photo was added to one');
+});
+
+test('story tags and favourites are cleaned and a hearted photo marks its story until overridden', async () => {
+  const cache = new Map();
+  const storage = { getItem: async key => cache.get(key) ?? null, setItem: async (key, value) => { cache.set(key, value); } };
+  const id = '00000000-0000-4000-8000-000000000002';
+  const prefs = load('lib/story-preferences.ts', {
+    '@react-native-async-storage/async-storage': { __esModule: true, default: storage },
+    './supabase': { supabase: { auth: { getSession: async () => ({ data: { session: { user: { id: 'first' } } } }) } } },
+    './api': { listStories: async () => [{ id, title: 'Trip' }], listFavourites: async () => [{ story_id: id }] },
+  });
+  assert.equal((await prefs.listStoriesWithPreferences())[0].favourite, true);
+  await prefs.saveStoryPreference('first', id, { favourite: false, tags: [' Baking ', 'Baking', '', 'a', 'b', 'c', 'd', 'e'] });
+  const [story] = await prefs.listStoriesWithPreferences();
+  assert.equal(story.favourite, false);
+  assert.deepEqual(Array.from(story.tags), ['Baking', 'a', 'b', 'c', 'd']);
+});
+
+test('the Android map is only drawn when the build carries a Google Maps key', () => {
+  const file = path.join(__dirname, '..', 'app.config.js');
+  const base = { plugins: ['expo-router'], extra: { eas: { projectId: 'x' } } };
+  const previous = process.env.GOOGLE_MAPS_ANDROID_API_KEY;
+  delete require.cache[file];
+  const configure = require(file);
+  try {
+    delete process.env.GOOGLE_MAPS_ANDROID_API_KEY;
+    const without = configure({ config: base });
+    assert.equal(without.extra.androidMapsEnabled, false);
+    assert.equal(without.extra.eas.projectId, 'x');
+    assert.deepEqual(without.plugins, ['expo-router']);
+    process.env.GOOGLE_MAPS_ANDROID_API_KEY = 'test-key';
+    const withKey = configure({ config: base });
+    assert.equal(withKey.extra.androidMapsEnabled, true);
+    assert.deepEqual(withKey.plugins.at(-1), ['react-native-maps', { androidGoogleMapsApiKey: 'test-key' }]);
+  } finally {
+    if (previous === undefined) delete process.env.GOOGLE_MAPS_ANDROID_API_KEY;
+    else process.env.GOOGLE_MAPS_ANDROID_API_KEY = previous;
+  }
+});
+
+test('iOS presentation uses the approved Whole Story name and packaged fonts', () => {
   const app = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'app.json'), 'utf8'));
   const theme = fs.readFileSync(path.join(__dirname, '..', 'lib/theme.ts'), 'utf8');
   const layout = fs.readFileSync(path.join(__dirname, '..', 'app/_layout.tsx'), 'utf8');
   const ui = fs.readFileSync(path.join(__dirname, '..', 'components/ui.tsx'), 'utf8');
   const settings = fs.readFileSync(path.join(__dirname, '..', 'app/(tabs)/settings.tsx'), 'utf8');
-  assert.equal(app.expo.name, 'Whole Stories');
+  assert.equal(app.expo.name, 'Whole Story');
   assert.equal(app.expo.ios.bundleIdentifier, 'app.wholestory.ios');
   assert.match(theme, /Newsreader_600SemiBold/);
   assert.match(theme, /Inter_400Regular/);
@@ -304,7 +452,7 @@ test('reference photography is bundled locally and used in each intended app sta
     assert.equal(fs.existsSync(asset), true, filename + ' missing');
     assert.ok(fs.statSync(asset).size > 1500, filename + ' is unexpectedly small');
   }
-  for (const filename of ['hero_couple_clean.png', 'photo_dog.jpg', 'photo_voice.jpg', 'timeline_greece.jpg', 'timeline_dinner.jpg', 'timeline_engagement.jpg', 'collab_friends.jpg', 'collab_mountains.jpg', 'collab_outdoors.jpg', 'collab_dinner.jpg', 'splash_glow_background.jpg']) {
+  for (const filename of ['hero_couple_clean.jpg', 'photo_dog.jpg', 'photo_voice.jpg', 'timeline_greece.jpg', 'timeline_dinner.jpg', 'timeline_engagement.jpg', 'collab_friends.jpg', 'collab_mountains.jpg', 'collab_outdoors.jpg', 'collab_dinner.jpg', 'splash_glow_background.jpg']) {
     assert.ok(welcome.includes('onboarding/' + filename), 'welcome not using ' + filename);
     const bytes = fs.readFileSync(path.join(root, 'assets/onboarding', filename));
     assert.ok(bytes.length > 1500, filename + ' is unexpectedly small');
@@ -312,7 +460,7 @@ test('reference photography is bundled locally and used in each intended app sta
   }
   assert.ok(onboarding.includes('onboarding/photo-collage.jpg'));
   assert.ok(onboarding.includes('onboarding/plan-collage.jpg'));
-  assert.ok(home.includes('onboarding/couple.jpg'));
+  assert.ok(!home.includes('assets/onboarding/'), 'Home must not show onboarding stock photography');
   assert.ok(settings.includes('Replay the five photo-led welcome screens'));
   assert.ok(!welcome.includes('images.unsplash.com'));
   assert.ok(!onboarding.includes('images.unsplash.com'));

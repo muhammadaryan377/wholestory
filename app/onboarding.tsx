@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as ML from 'expo-media-library/legacy';
@@ -14,6 +14,7 @@ import { chooseLocalProfilePhoto, readLocalProfilePhoto } from '@/lib/profile-ph
 import { getPrefs, setPrefs } from '@/lib/notify';
 import { buy, configurePayments, getPackages, restore, PAYMENTS_ENABLED } from '@/lib/payments';
 import { Btn, Chip, Thread, ToggleRow } from '@/components/ui';
+import { Icon } from '@/components/icon';
 import { C, F } from '@/lib/theme';
 
 const INTERESTS = ['Family', 'Couples', 'Travel', 'Friends', 'Events', 'Everyday life', 'Pets', 'Milestones'];
@@ -109,6 +110,17 @@ export default function Onboarding() {
       .finally(() => { if (alive) setPackageBusy(false); });
     return () => { alive = false; };
   }, [step, userId]);
+
+  useFocusEffect(useCallback(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (busy) return true;
+      if (editor) { setEditor(null); return true; }
+      if (step === 0) return false;
+      setStep(previous => previous === 3 && !photoAccess ? 1 : previous - 1);
+      return true;
+    });
+    return () => sub.remove();
+  }, [busy, editor, step, photoAccess]));
 
   const loadGallery = async (reset = false) => {
     if (galleryBusy) return;
@@ -257,7 +269,7 @@ export default function Onboarding() {
     setBusy(true);
     try {
       if (await restore()) await completeSetupAfterPurchase();
-      else Alert.alert('No purchases found', 'There are no active Whole Stories subscriptions to restore.');
+      else Alert.alert('No purchases found', 'There are no active Whole Story subscriptions to restore.');
     } catch (reason) {
       Alert.alert('Could not restore', reason instanceof Error ? reason.message : 'Try again.');
     } finally { setBusy(false); }
@@ -275,7 +287,7 @@ export default function Onboarding() {
           style={[styles.back, (step === 0 && !editor) && { opacity: 0 }]}>
           <Text style={{ fontSize: 26, color: C.green }}>‹</Text>
         </Pressable>
-        <Text style={styles.brand}>Whole Stories</Text>
+        <Text style={styles.brand}>Whole Story</Text>
         <Thread width={98} />
       </View>
       <Progress active={step} />
@@ -320,12 +332,12 @@ export default function Onboarding() {
       <ScrollView key={step} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {step === 0 ? <>
           <Text style={styles.heading}>Tell us about you</Text>
-          <Text style={styles.paragraph}>A few details to personalise your Whole Stories experience.</Text>
+          <Text style={styles.paragraph}>A few details to personalise your Whole Story experience.</Text>
           <View style={{ alignItems: 'center', marginVertical: 16 }}>
             <Pressable accessibilityRole="button" accessibilityLabel="Choose a profile photo" onPress={chooseAvatar} style={styles.avatar}>
               {avatar ? <Image source={{ uri: avatar }} style={{ width: 110, height: 110, borderRadius: 55 }} contentFit="cover" /> :
                 <Text style={{ fontFamily: F.serif, fontSize: 48, color: C.navy }}>{name.trim().charAt(0).toUpperCase() || 'W'}</Text>}
-              <View style={styles.cameraBadge}><Text style={{ color: '#FFF', fontSize: 18 }}>＋</Text></View>
+              <View style={styles.cameraBadge}><Icon name="camera" size={17} color="#FFF" /></View>
             </Pressable>
             <Text style={styles.note}>Optional profile photo · stored on this device</Text>
           </View>
@@ -346,9 +358,9 @@ export default function Onboarding() {
           <Text style={styles.heading}>Add your photos</Text>
           <Text style={styles.paragraph}>Choose which photos to explore. We’ll suggest groups by date and time, then you decide what to keep.</Text>
           <IntroPhotoCards />
-          <View style={styles.benefit}><Text style={styles.benefitIcon}>♧</Text><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>Private by default</Text><Text style={styles.smallText}>Nothing is uploaded until you choose to create a story.</Text></View></View>
-          <View style={styles.benefit}><Text style={styles.benefitIcon}>✓</Text><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>You&apos;re in control</Text><Text style={styles.smallText}>Rename groups, add or remove photos, or skip this step.</Text></View></View>
-          <View style={styles.benefit}><Text style={styles.benefitIcon}>◎</Text><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>No AI or location tracking</Text><Text style={styles.smallText}>Photos are grouped on your phone using their dates and times.</Text></View></View>
+          <View style={styles.benefit}><View style={styles.benefitIcon}><Icon name="lock" size={22} color={C.green} /></View><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>Private by default</Text><Text style={styles.smallText}>Nothing is uploaded until you choose to create a story.</Text></View></View>
+          <View style={styles.benefit}><View style={styles.benefitIcon}><Icon name="check" size={22} color={C.green} /></View><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>You&apos;re in control</Text><Text style={styles.smallText}>Rename groups, add or remove photos, or skip this step.</Text></View></View>
+          <View style={styles.benefit}><View style={styles.benefitIcon}><Icon name="shield" size={22} color={C.green} /></View><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>No AI or location tracking</Text><Text style={styles.smallText}>Photos are grouped on your phone using their dates and times.</Text></View></View>
         </> : null}
 
         {step === 2 ? <>
@@ -411,7 +423,7 @@ export default function Onboarding() {
             <Btn title={packages[packageIndex] ? 'Continue with ' + (packages[packageIndex].packageType === 'ANNUAL' ? 'Yearly' : 'Monthly') : 'Plans unavailable'}
               busy={busy} disabled={!packages.length || packageBusy} onPress={buyPlan} />
             <Btn title="Restore purchases" kind="link" busy={busy} onPress={restorePlan} />
-          </> : <Btn title="Continue to Whole Stories" busy={busy} onPress={completeSetup} />}
+          </> : <Btn title="Continue to Whole Story" busy={busy} onPress={completeSetup} />}
       </View>
     </KeyboardAvoidingView>
   </SafeAreaView>;
@@ -439,7 +451,7 @@ const styles = StyleSheet.create({
   photoCards: { height: 205, flexDirection: 'row', marginVertical: 8, alignItems: 'center', justifyContent: 'center' },
   photoCollage: { width: '100%', maxWidth: 430, height: 200 },
   benefit: { flexDirection: 'row', alignItems: 'center', gap: 14, marginVertical: 10 },
-  benefitIcon: { width: 46, height: 46, borderRadius: 23, overflow: 'hidden', textAlign: 'center', textAlignVertical: 'center', backgroundColor: C.greenSoft, color: C.green, fontSize: 25 },
+  benefitIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: C.greenSoft },
   benefitTitle: { color: C.navy, fontFamily: F.serif, fontSize: 19, marginBottom: 3 },
   smallText: { fontFamily: F.sans, color: C.grey, fontSize: 12, lineHeight: 17 },
   groupCard: { flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 10, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, borderRadius: 17 },

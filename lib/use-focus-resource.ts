@@ -15,5 +15,5 @@ export function useFocusResource<T>(fetcher: () => Promise<T>) {
     }
   }, [fetcher]);
   useFocusEffect(useCallback(() => { void reload(); return () => { generation.current += 1; }; }, [reload]));
-  return { data, error, reload };
+  return { data, error: data === null ? error : '', reload };
 }

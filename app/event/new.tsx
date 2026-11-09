@@ -8,6 +8,7 @@ import { Screen, H1, H2, P, Field, Btn, Chip, Small } from '@/components/ui';
 import { createEvent } from '@/lib/api';
 import { C, F } from '@/lib/theme';
 import { dateInput } from '@/lib/dates';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 
 const TYPES = ['Wedding', 'Birthday', 'Holiday', 'Family gathering', 'Graduation', 'Other'];
 type M = { name: string; time: string };
@@ -24,6 +25,7 @@ export default function NewEvent() {
   const [moments, setMoments] = useState<M[]>(DEFAULTS.Wedding); const [newM, setNewM] = useState(''); const [busy, setBusy] = useState(false);
   const [cover, setCoverUri] = useState<string | null>(null);
   const pickCover = async () => { const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85, allowsEditing: true, aspect: [16, 9] }); if (!r.canceled) setCoverUri(r.assets[0].uri); };
+  useUnsavedGuard(!busy && (!!name.trim() || !!place.trim() || !!cover));
   const iso = dateInput;
   const save = async () => {
     if (busy) return;

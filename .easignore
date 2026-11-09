@@ -1,0 +1,67 @@
+# EAS uses this file INSTEAD of .gitignore, so every .gitignore rule is repeated here.
+# Keep the two in step. Check changes with:
+#   eas build:inspect --platform android --profile preview --stage archive --output <dir> --force
+
+# dependencies (installed on the build server)
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files (cloud builds read EAS environment variables)
+.env
+.env.*
+!.env.example
+
+# typescript
+*.tsbuildinfo
+
+# Generated native folders. Must stay excluded: if android/ is uploaded, EAS skips
+# prebuild and ignores the native configuration in app.json.
+/ios
+/android
+
+guest-web/config.js
+
+# Local caches and inspection output
+.npm-cache/
+.cache/
+.gradle/
+eas-archive/
+
+# Local build artifacts and test reports
+*.apk
+*.aab
+coverage/
+test-results/
+playwright-report/
+
+# Editor settings and the misnamed ignore file, which EAS does not read
+.idea/
+.vscode/
+.easeignore

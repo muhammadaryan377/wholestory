@@ -48,10 +48,16 @@ export async function uploadFile(bucket: 'media' | 'event-media', folder: string
   return path;
 }
 
-const cache = new Map<string, { url: string; at: number }>();
+const cache = new Map<string, { url: string; at: number; private: boolean }>();
+const CACHE_MS = 50 * 60 * 1000;
 export function clearMediaCache() { cache.clear(); }
 /** A temporary link to view a private story file. */
 export async function viewUrl(path: string) {
+  const known = cache.get(path);
+  if (known && Date.now() - known.at < CACHE_MS) {
+    if (known.private && !privateIsUnlocked()) throw new PrivateLockedError();
+    return known.url;
+  }
   const photo = await supabase.from('entry_photos').select('entries(stories(private))').eq('path', path).maybeSingle();
   if (photo.error) throw photo.error;
   let story = (photo.data as any)?.entries?.stories;
@@ -62,11 +68,9 @@ export async function viewUrl(path: string) {
   }
   if (!story) return '';
   if (story.private && !privateIsUnlocked()) throw new PrivateLockedError();
-  const hit = cache.get(path);
-  if (hit && Date.now() - hit.at < 50 * 60 * 1000) return hit.url;
   const { data, error } = await supabase.storage.from('media').createSignedUrl(path, 60 * 60);
   if (error || !data) return '';
-  cache.set(path, { url: data.signedUrl, at: Date.now() });
+  cache.set(path, { url: data.signedUrl, at: Date.now(), private: !!story.private });
   return data.signedUrl;
 }
 export const eventUrl = (path: string) => supabase.storage.from('event-media').getPublicUrl(path).data.publicUrl;

@@ -1,11 +1,16 @@
-import { useCallback, useState } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { type ComponentRef, useCallback, useEffect, useRef, useState } from 'react';
+import { Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
+import Constants from 'expo-constants';
+import type { User } from '@supabase/supabase-js';
 import { Alert } from '@/lib/alert';
 import { router, useFocusEffect } from 'expo-router';
-import { LoadError, Screen, H1, H2, Field, Btn, NavRow, Small } from '@/components/ui';
+import { Screen, H1, H2, Btn, Small } from '@/components/ui';
+import { Icon } from '@/components/icon';
+import { SettingsGroup, SettingsRow } from '@/components/settings-rows';
 import { supabase } from '@/lib/supabase';
 import { deleteAccount, myName, saveName, savePushToken } from '@/lib/api';
+import { clearLocalAccountData } from '@/lib/account-data';
 import { exportMyData } from '@/lib/exporter';
 import { PAYMENTS_ENABLED } from '@/lib/payments';
 import { useAuth } from '@/lib/auth';
@@ -15,97 +20,205 @@ import { C, F } from '@/lib/theme';
 const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL ?? 'https://wholestory.app/privacy';
 const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://wholestory.app/terms';
 const SUPPORT = process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'support@wholestory.app';
+const SAVED_NOTICE_MS = 2000;
+const VERSION = Constants.expoConfig?.version;
+const SUBSCRIPTION = Platform.OS === 'android'
+  ? { url: 'https://play.google.com/store/account/subscriptions', sub: 'Manage or cancel in Google Play' }
+  : { url: 'https://apps.apple.com/account/subscriptions', sub: 'Manage or cancel in your App Store settings' };
+const PRIVATE_LOCK = Platform.select({ ios: 'Locked with a passcode or Face ID', android: 'Locked with a passcode or fingerprint', default: 'Locked with a passcode' });
+
+const openLink = async (url: string, fallback: string) => {
+  try { await Linking.openURL(url); }
+  catch { Alert.alert('Could not open this', fallback); }
+};
 
 export default function Settings() {
   const { session } = useAuth();
   const userId = session?.user.id;
+  const metadataName: string = session?.user.user_metadata?.name ?? '';
   const [avatar, setAvatar] = useState<string | null>(null);
   const [avatarRevision, setAvatarRevision] = useState(0);
   const [photoBusy, setPhotoBusy] = useState(false);
-  const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [busy, setBusy] = useState(false); const [exporting, setExporting] = useState('');
-  const [loadError, setLoadError] = useState('');
+  const [name, setName] = useState(metadataName);
+  const [savedName, setSavedName] = useState(metadataName);
+  const [freshUser, setFreshUser] = useState<User | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState('');
+  const [justSaved, setJustSaved] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const nameInput = useRef<ComponentRef<typeof TextInput>>(null);
+  const editing = useRef(false);
+  const account = freshUser ?? session?.user;
+  const email = account?.email ?? '';
+  const verified = !!account?.email_confirmed_at;
+
   const load = useCallback(async () => {
+    if (userId) readLocalProfilePhoto(userId).then(setAvatar).catch(() => setAvatar(null));
     try {
-      setLoadError('');
-      const [name, user] = await Promise.all([myName(), supabase.auth.getUser()]);
+      setLoadError(false);
+      const [loadedName, user] = await Promise.all([myName(), supabase.auth.getUser()]);
       if (user.error) throw user.error;
-      setName(name); setEmail(user.data.user?.email ?? '');
-      if (userId) setAvatar(await readLocalProfilePhoto(userId).catch(() => null));
-    } catch (e) { setLoadError(e instanceof Error ? e.message : 'Could not load account details.'); }
+      setSavedName(loadedName);
+      // Coming back to this tab must not wipe a name someone is still typing.
+      if (!editing.current) setName(loadedName);
+      setFreshUser(user.data.user);
+    } catch { setLoadError(true); }
   }, [userId]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useEffect(() => {
+    if (!justSaved) return;
+    const timer = setTimeout(() => setJustSaved(false), SAVED_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [justSaved]);
+
   const chooseAvatar = async () => {
-    if (!session?.user.id || photoBusy) return;
+    if (!userId || photoBusy) return;
     setPhotoBusy(true);
-    try { const uri = await chooseLocalProfilePhoto(session.user.id); if (uri) { setAvatar(uri); setAvatarRevision(v => v + 1); } }
+    try { const uri = await chooseLocalProfilePhoto(userId); if (uri) { setAvatar(uri); setAvatarRevision(v => v + 1); } }
     catch (e) { Alert.alert('Could not change profile photo', e instanceof Error ? e.message : 'Try again.'); }
     finally { setPhotoBusy(false); }
   };
   const removeAvatar = () => {
-    if (!session?.user.id || photoBusy) return;
+    if (!userId || photoBusy) return;
     Alert.alert('Remove profile photo?', 'This only removes the photo from your profile on this device.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: async () => {
-        if (!session?.user.id) return;
         setPhotoBusy(true);
-        try { await removeLocalProfilePhoto(session.user.id); setAvatar(null); }
+        try { await removeLocalProfilePhoto(userId); setAvatar(null); }
         catch (e) { Alert.alert('Could not remove photo', e instanceof Error ? e.message : 'Try again.'); }
         finally { setPhotoBusy(false); }
       } },
     ]);
   };
-  const save = async () => { setBusy(true); try { await saveName(name.trim()); Alert.alert('Saved'); } finally { setBusy(false); } };
-  const del = () => Alert.alert('Delete your account?', 'This deletes your account, stories, photos and recordings from Whole Stories. Your originals stay on your phone. This cannot be undone.', [
+  const photoOptions = () => {
+    if (!avatar) { void chooseAvatar(); return; }
+    Alert.alert('Profile photo', 'Stored only on this device.', [
+      { text: 'Change photo', onPress: chooseAvatar },
+      { text: 'Remove photo', style: 'destructive', onPress: removeAvatar },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+  const save = async () => {
+    const next = name.trim();
+    setBusy(true);
+    try { await saveName(next); editing.current = false; setName(next); setSavedName(next); setJustSaved(true); }
+    finally { setBusy(false); }
+  };
+  const download = async () => {
+    if (exporting) return;
+    setExporting('Preparing…');
+    try { await exportMyData(setExporting); }
+    catch (e: any) { Alert.alert('Could not download', e.message ?? 'Please try again.'); }
+    finally { setExporting(''); }
+  };
+  const logOut = () => Alert.alert('Log out of Whole Story?', 'Your stories stay safe in your account.', [
     { text: 'Cancel', style: 'cancel' },
-    { text: 'Delete everything', style: 'destructive', onPress: async () => { try { await deleteAccount(); router.replace('/'); } catch (e: any) { Alert.alert('Could not delete', e.message); } } },
+    { text: 'Log out', onPress: async () => {
+      await savePushToken(null).catch(() => {});
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.replace('/');
+    } },
   ]);
-  if (loadError) return <LoadError error={loadError} onRetry={load} />;
+  const del = () => Alert.alert('Delete your account?', 'This deletes your account, stories, photos and recordings from Whole Story. Your originals stay on your phone. This cannot be undone.', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Delete everything', style: 'destructive', onPress: async () => {
+      try {
+        await deleteAccount();
+        if (userId) await clearLocalAccountData(userId).catch(() => {});
+        router.replace('/');
+      } catch (e: any) { Alert.alert('Could not delete', e.message); }
+    } },
+  ]);
+
   return (
-    <Screen>
+    <Screen style={{ paddingTop: 8, paddingBottom: 28 }}>
       <H1>Settings</H1>
-      <H2>Account</H2>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, padding: 13, borderRadius: 16, marginBottom: 15 }}>
-        <Pressable accessibilityRole="button" accessibilityLabel={avatar ? 'Change your profile photo' : 'Add your profile photo'} onPress={chooseAvatar}
-          disabled={photoBusy} style={{ width: 68, height: 68, backgroundColor: C.greenSoft, borderRadius: 34, alignItems: 'center', justifyContent: 'center' }}>
-          {avatar ? <Image key={avatarRevision} source={{ uri: avatar }} cachePolicy="none" contentFit="cover" style={{ width: 68, height: 68, borderRadius: 34 }} /> :
-            <Text style={{ fontFamily: F.serif, color: C.green, fontSize: 29 }}>{name[0]?.toUpperCase() ?? '+'}</Text>}
+      {loadError ? <View accessibilityRole="alert" style={styles.notice}>
+        <Text style={styles.noticeText}>Couldn’t refresh your account. Check your connection.</Text>
+        <Pressable accessibilityRole="button" onPress={() => { void load(); }} hitSlop={8}><Text style={styles.noticeAction}>Try again</Text></Pressable>
+      </View> : null}
+      <View style={styles.sectionHeading}>
+        <View style={styles.sectionIcon}><Icon name="person" size={20} color={C.green} /></View>
+        <H2 style={{ marginBottom: 0 }}>Account</H2>
+      </View>
+      <View style={styles.card}>
+        <Pressable accessibilityRole="button" accessibilityLabel={avatar ? 'Change or remove your profile photo' : 'Add your profile photo'} onPress={photoOptions} disabled={photoBusy} style={styles.avatarRing}>
+          {avatar ? <Image key={avatarRevision} source={{ uri: avatar }} cachePolicy="none" contentFit="cover" style={styles.avatar} /> :
+            <View style={[styles.avatar, styles.avatarEmpty]}><Text style={styles.avatarLetter}>{savedName[0]?.toUpperCase() ?? '+'}</Text></View>}
+          <View style={styles.cameraBadge}><Icon name="camera" size={15} color={C.white} /></View>
         </Pressable>
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.navy }}>Your profile photo</Text>
-          <Pressable accessibilityRole="button" disabled={photoBusy} onPress={chooseAvatar}><Text style={{ fontFamily: F.sansMedium, color: C.green, fontSize: 13 }}>{avatar ? 'Change photo' : 'Add photo'}</Text></Pressable>
-          {avatar ? <Pressable accessibilityRole="button" disabled={photoBusy} onPress={removeAvatar}><Text style={{ fontFamily: F.sansMedium, color: C.red, fontSize: 12 }}>Remove photo</Text></Pressable> : null}
-          <Small>Stored on this device.</Small>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={styles.nameRow}>
+            <Text style={styles.displayName} numberOfLines={2}>{savedName || 'Add your name'}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Edit profile" onPress={() => nameInput.current?.focus()} hitSlop={6} style={styles.editButton}>
+              <Icon name="pencil" size={14} color={C.green} /><Text style={styles.editText}>Edit Profile</Text>
+            </Pressable>
+          </View>
+          {email ? <Text style={styles.email} numberOfLines={1}>{email}</Text> : null}
+          {email && verified ? <View style={styles.verified}><Icon name="check" size={14} color={C.green} /><Text style={styles.verifiedText}>Account verified</Text></View> : null}
         </View>
       </View>
-      <Field label="Your name" value={name} onChangeText={setName} />
-      <Small style={{ marginBottom: 8 }}>{email}</Small>
-      <Btn title="Save" kind="outline" onPress={save} busy={busy} />
+      <Text style={styles.label}>Your name</Text>
+      <View style={styles.nameField}>
+        <Icon name="person" size={21} color={C.navy} />
+        <TextInput ref={nameInput} accessibilityLabel="Your name" value={name} onChangeText={text => { editing.current = true; setName(text); setJustSaved(false); }} autoCapitalize="words" returnKeyType="done" placeholder="Your name" placeholderTextColor={C.faint} style={styles.nameInput} />
+      </View>
+      <Btn title={justSaved ? 'Saved ✓' : 'Save Changes'} onPress={save} busy={busy} disabled={!name.trim()} />
       {session?.user.is_anonymous ? <>
-        <Small style={{ marginBottom: 8 }}>You&apos;re in preview guest mode. Sign in with Apple, Google, or email to use an existing account. Guest stories are not transferred.</Small>
-        <NavRow title="Sign in or create an account" sub="Apple, Google, or email" onPress={() => router.push('/sign-in')} />
+        <Small style={{ marginVertical: 8 }}>You&apos;re in preview guest mode. Sign in with Apple, Google, or email to use an existing account. Guest stories are not transferred.</Small>
+        <Btn title="Sign in or create an account" kind="outline" onPress={() => router.push('/sign-in')} />
       </> : null}
-      <H2 style={{ marginTop: 14 }}>Your stories</H2>
-      <NavRow title="Notifications" sub="Memories, an evening prompt, and when people add to your stories" onPress={() => router.push('/notifications')} />
-      <NavRow title="People" sub="People Pages" onPress={() => router.push('/people')} />
-      <NavRow title="Favourites" sub="Photos you’ve hearted" onPress={() => router.push('/favourites')} />
-      <NavRow title="Private albums" sub="Locked with a passcode or Face ID" onPress={() => router.push('/private')} />
-      <NavRow title={exporting || 'Download your data'} sub="All your stories, photos, recordings and event walls in one file" onPress={async () => { if (exporting) return; setExporting('Preparing…'); try { await exportMyData(setExporting); } catch (e: any) { Alert.alert('Could not download', e.message ?? ''); } finally { setExporting(''); } }} />
-      {PAYMENTS_ENABLED ? <NavRow title="Subscription" sub="Manage or cancel in your App Store settings" onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions')} /> : null}
-      <H2 style={{ marginTop: 14 }}>Privacy</H2>
-      <NavRow title="Hard memories" sub="Choose which stories come back in memories" onPress={() => router.push('/hard-memories')} />
-      <NavRow title="Privacy Policy" onPress={() => Linking.openURL(PRIVACY_URL)} />
-      <NavRow title="Terms of Use" onPress={() => Linking.openURL(TERMS_URL)} />
-      <H2 style={{ marginTop: 14 }}>Help</H2>
-      <NavRow title="View introduction" sub="Replay the five photo-led welcome screens" onPress={() => router.push('/welcome')} />
-      <NavRow title="Contact us or send feedback" sub={SUPPORT} onPress={() => Linking.openURL(`mailto:${SUPPORT}?subject=Whole Stories%20test%20feedback`)} />
-      <Btn title="Log out" kind="outline" onPress={async () => {
-        await savePushToken(null).catch(() => {});
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
-        router.replace('/');
-      }} style={{ marginTop: 18 }} />
-      <NavRow title="Delete my account" danger onPress={del} />
-      <Small style={{ textAlign: 'center', marginTop: 10 }}>Whole Stories test version</Small>
+
+      <SettingsGroup title="Your stories">
+        <SettingsRow icon="bell" title="Notifications" sub="Memories, reminders and updates from others" onPress={() => router.push('/notifications')} />
+        <SettingsRow icon="people" title="People" sub="Everyone in your stories" onPress={() => router.push('/people')} />
+        <SettingsRow icon="heart" title="Favourites" sub="Photos, stories and voice notes" onPress={() => router.navigate('/favourites')} />
+        <SettingsRow icon="lock" title="Private albums" sub={PRIVATE_LOCK} onPress={() => router.push('/private')} />
+        <SettingsRow icon="download" title={exporting || 'Download your data'} sub="Stories, photos, recordings and event walls" onPress={download} disabled={!!exporting} />
+        {PAYMENTS_ENABLED ? <SettingsRow icon="card" title="Subscription" sub={SUBSCRIPTION.sub} onPress={() => openLink(SUBSCRIPTION.url, 'Open your subscriptions in your phone’s app store.')} /> : null}
+      </SettingsGroup>
+
+      <SettingsGroup title="Privacy">
+        <SettingsRow icon="memories" title="Hard memories" sub="Choose which stories come back in memories" onPress={() => router.push('/hard-memories')} />
+        <SettingsRow icon="shield" title="Privacy Policy" onPress={() => openLink(PRIVACY_URL, PRIVACY_URL)} />
+        <SettingsRow icon="document" title="Terms of Use" onPress={() => openLink(TERMS_URL, TERMS_URL)} />
+      </SettingsGroup>
+
+      <SettingsGroup title="Help">
+        <SettingsRow icon="play" title="View introduction" sub="Replay the five photo-led welcome screens" onPress={() => router.push('/welcome')} />
+        <SettingsRow icon="mail" title="Contact us or send feedback" sub={SUPPORT} onPress={() => openLink(`mailto:${SUPPORT}?subject=${encodeURIComponent('Whole Story feedback')}`, `No email app was found. You can write to us at ${SUPPORT}.`)} />
+      </SettingsGroup>
+
+      <SettingsGroup>
+        <SettingsRow icon="logout" title="Log out" onPress={logOut} />
+        <SettingsRow icon="trash" title="Delete my account" danger onPress={del} />
+      </SettingsGroup>
+      <Small style={{ textAlign: 'center', marginTop: 14 }}>Whole Story{VERSION ? ` · Version ${VERSION}` : ''}</Small>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  notice: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.redSoft, borderRadius: 12, padding: 12, marginBottom: 10 },
+  noticeText: { flex: 1, fontFamily: F.sans, fontSize: 13, color: C.ink },
+  noticeAction: { fontFamily: F.sansBold, fontSize: 13, color: C.green },
+  sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  sectionIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#E2EDD9', alignItems: 'center', justifyContent: 'center' },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card, paddingHorizontal: 12, paddingVertical: 14, borderRadius: 16, marginBottom: 14 },
+  avatarRing: { width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: '#BFD6B2', alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 72, height: 72, borderRadius: 36 },
+  avatarEmpty: { backgroundColor: C.greenSoft, alignItems: 'center', justifyContent: 'center' },
+  avatarLetter: { fontFamily: F.serif, color: C.green, fontSize: 29 },
+  cameraBadge: { position: 'absolute', right: -5, bottom: -3, width: 30, height: 30, borderRadius: 15, backgroundColor: C.green, borderWidth: 2, borderColor: C.card, alignItems: 'center', justifyContent: 'center' },
+  nameRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  displayName: { flex: 1, minWidth: 0, fontFamily: F.serif, fontSize: 19, color: C.navy },
+  editButton: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: C.green, borderRadius: 15, paddingHorizontal: 9, paddingVertical: 5 },
+  editText: { fontFamily: F.sansMedium, fontSize: 11.5, color: C.green },
+  email: { fontFamily: F.sans, fontSize: 13, color: C.grey, marginTop: 2 },
+  verified: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: '#E2EDD9', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3, marginTop: 6 },
+  verifiedText: { fontFamily: F.sansMedium, fontSize: 12, color: C.green },
+  label: { fontFamily: F.sansBold, fontSize: 13, color: C.ink, marginBottom: 6 },
+  nameField: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingHorizontal: 14, borderRadius: 24, borderWidth: 1, borderColor: '#E0D9CD', backgroundColor: C.card, marginBottom: 4 },
+  nameInput: { flex: 1, minWidth: 0, fontFamily: F.sans, fontSize: 15, color: C.ink, paddingVertical: 10 },
+});

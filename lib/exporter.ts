@@ -37,7 +37,7 @@ async function saveAndShare(zip: JSZip, name: string) {
   await Sharing.shareAsync(file.uri, { mimeType: 'application/zip', dialogTitle: name });
 }
 
-/** Everything you have in Wholestory: stories, photos, recordings and words, plus your event walls. */
+/** Everything you have in Whole Story: stories, photos, recordings and words, plus your event walls. */
 export async function exportMyData(onProgress?: (msg: string) => void) {
   const zip = new JSZip();
   const stories = [...(await listStories()), ...(await listStories({ private: true }))];
@@ -61,7 +61,7 @@ export async function exportMyData(onProgress?: (msg: string) => void) {
   }
   const events = await listEvents();
   for (const ev of events) { onProgress?.(`Event: ${ev.name}`); await addEvent(zip.folder(`Event walls/${safe(ev.name)}-${ev.id}`)!, ev.id); }
-  await saveAndShare(zip, 'Wholestory-my-data.zip');
+  await saveAndShare(zip, 'Whole-Story-my-data.zip');
 }
 async function addEvent(dir: JSZip, eventId: string) {
   const { ev, posts, moments } = await getEvent(eventId);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { C, F } from '@/lib/theme';
 import { PrivateLockedError, usePrivateUnlocked } from '@/lib/private-access';
 import { Btn, P, Screen } from '@/components/ui';
 import { Alert } from '@/lib/alert';
+import { Icon } from '@/components/icon';
 
 /** One photo, full screen, with what the photo itself knows: date, time and place. */
 export default function PhotoViewer() {
@@ -35,15 +36,16 @@ export default function PhotoViewer() {
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <Stack.Screen options={{ headerShown: false }} />
       <Image source={uri ? { uri } : undefined} style={{ flex: 1, width }} contentFit="contain" />
+      {!uri ? <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}><ActivityIndicator color="#fff" size="large" /></View> : null}
       <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 }}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Close"><Text style={{ color: '#fff', fontSize: 30 }}>×</Text></Pressable>
+        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close"><Icon name="close" size={30} color="#fff" /></Pressable>
         <Pressable disabled={savingFavourite} onPress={async () => {
           if (savingFavourite) return;
           setSavingFavourite(true);
           try { await toggleFavourite(p.id, !fav); setFav(!fav); }
           catch (e) { Alert.alert('Could not update Favourites', e instanceof Error ? e.message : 'Please try again.'); }
           finally { setSavingFavourite(false); }
-        }} hitSlop={12} accessibilityLabel={fav ? 'Remove from Favourites' : 'Add to Favourites'}>
+        }} hitSlop={12} accessibilityRole="button" accessibilityLabel={fav ? 'Remove from Favourites' : 'Add to Favourites'}>
           <Text style={{ fontSize: 28, color: fav ? C.dotRed : '#fff' }}>{fav ? '♥' : '♡'}</Text>
         </Pressable>
       </SafeAreaView>
@@ -52,7 +54,7 @@ export default function PhotoViewer() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
           {taken ? chip(taken.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })) : null}
           {taken ? chip(taken.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) : null}
-          {p.lat && p.lng ? <Pressable onPress={() => router.push('/map')}>{chip('📍 On your map')}</Pressable> : null}
+          {p.lat && p.lng ? <Pressable onPress={() => router.push('/map')}>{chip('On your map')}</Pressable> : null}
         </View>
         {p.story ? <Pressable onPress={() => router.replace(`/story/${p.story}`)}><Text style={{ color: '#fff', fontFamily: F.sansMedium, textDecorationLine: 'underline', marginTop: 4 }}>In {p.title || 'a story'} ›</Text></Pressable> : null}
       </SafeAreaView>

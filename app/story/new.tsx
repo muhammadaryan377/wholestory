@@ -10,6 +10,7 @@ import { StoryLocationPicker } from '@/components/story-location';
 import { createStory, emptyDraft, setPeopleInStory, type Draft } from '@/lib/api';
 import { STORY_CATEGORIES, saveStoryPreference, type StoryCategory, type StoryLocation } from '@/lib/story-preferences';
 import { useAuth } from '@/lib/auth';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { C, F } from '@/lib/theme';
 
 export default function NewStory() {
@@ -22,6 +23,7 @@ export default function NewStory() {
   const [category, setCategory] = useState<StoryCategory | null>(null);
   const [location, setLocation] = useState<StoryLocation | null>(null);
   const [busy, setBusy] = useState(false);
+  useUnsavedGuard(!busy && (draft.photos.length > 0 || !!draft.text.trim() || !!draft.audioUri));
   const save = async () => {
     if (busy) return;
     if (draft.recording || draft.processingAudio) return Alert.alert('Finish your recording first', 'Stop recording and wait for the words before saving.');

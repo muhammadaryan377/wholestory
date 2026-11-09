@@ -24,7 +24,7 @@ const FAILURES: Record<JoinFailureKind, { title: string; message: string; clearP
   expired: { title: 'This invitation has expired', message: 'Ask the story owner to send you a new invitation.', clearPending: true, retryable: false },
   private: { title: 'This story is private', message: 'Private stories can’t be joined with an invitation link.', clearPending: true, retryable: false },
   signin: { title: 'Please log in to join', message: 'Log in or create an account, and we’ll add you to the story.', clearPending: false, retryable: true },
-  network: { title: 'Couldn’t reach Whole Stories', message: 'Check your internet connection and try again. Your invitation is saved.', clearPending: false, retryable: true },
+  network: { title: 'Couldn’t reach Whole Story', message: 'Check your internet connection and try again. Your invitation is saved.', clearPending: false, retryable: true },
   unknown: { title: 'Couldn’t join this story', message: 'Something went wrong. Please try again. Your invitation is saved.', clearPending: false, retryable: true },
 };
 

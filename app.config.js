@@ -1,9 +1,23 @@
 // Expo SDK 58: associate the *same* public invite origin with both native apps.
 // Set EXPO_PUBLIC_INVITE_BASE_URL in the EAS build environment, and deploy
 // the matching AASA and assetlinks files to that exact host.
+
+// Google Maps on Android crashes without a key, so the map screen reads
+// extra.androidMapsEnabled and only draws the map when this build has one.
+function withAndroidMaps(config) {
+  const key = process.env.GOOGLE_MAPS_ANDROID_API_KEY;
+  return {
+    ...config,
+    extra: { ...config.extra, androidMapsEnabled: !!key },
+    plugins: key
+      ? [...(config.plugins ?? []), ['react-native-maps', { androidGoogleMapsApiKey: key }]]
+      : config.plugins,
+  };
+}
+
 module.exports = ({ config }) => {
   const raw = process.env.EXPO_PUBLIC_INVITE_BASE_URL;
-  if (!raw) return config;
+  if (!raw) return withAndroidMaps(config);
 
   let url;
   try { url = new URL(raw); }
@@ -21,7 +35,7 @@ module.exports = ({ config }) => {
     category: ['BROWSABLE', 'DEFAULT'],
     data: [{ scheme: 'https', host, pathPrefix: '/join/' }],
   };
-  return {
+  return withAndroidMaps({
     ...config,
     ios: {
       ...ios,
@@ -31,5 +45,5 @@ module.exports = ({ config }) => {
       ...android,
       intentFilters: [...(android.intentFilters ?? []), intent],
     },
-  };
+  });
 };

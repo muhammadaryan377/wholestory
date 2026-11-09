@@ -17,7 +17,7 @@ export async function shareStoryInvite(title: string, code: string): Promise<Sha
     const browser = (globalThis as { navigator?: { share?: (data: { title: string; text: string }) => Promise<void> } }).navigator;
     if (browser && typeof browser.share === 'function') {
       try {
-        await browser.share({ title: 'Whole Stories invitation', text: message });
+        await browser.share({ title: 'Whole Story invitation', text: message });
         return 'shared';
       } catch (error) {
         if ((error as { name?: string })?.name === 'AbortError') return 'dismissed';
@@ -29,8 +29,8 @@ export async function shareStoryInvite(title: string, code: string): Promise<Sha
   }
 
   const result = await Share.share(
-    { message, title: 'Whole Stories invitation' },
-    { subject: 'Invitation to Whole Stories', dialogTitle: 'Share story invitation' },
+    { message, title: 'Whole Story invitation' },
+    { subject: 'Invitation to Whole Story', dialogTitle: 'Share story invitation' },
   );
   return result.action === Share.dismissedAction ? 'dismissed' : 'shared';
 }

@@ -1,14 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
-import { listStories, type Story } from './api';
+import { listFavourites, listStories, type Story } from './api';
 
-export const STORY_CATEGORIES = ['Travel', 'Family', 'Events', 'Friends', 'Everyday life'] as const;
+export const STORY_CATEGORIES = ['Travel', 'Events', 'Family', 'Everyday life', 'Friends'] as const;
 export type StoryCategory = typeof STORY_CATEGORIES[number];
 export type StoryLocation = { lat: number; lng: number; source: 'current' | 'manual' };
-export type StoryPreference = { category?: StoryCategory; location?: StoryLocation };
-export type StoryWithPreference = Story & { category?: StoryCategory; explicitLocation?: StoryLocation };
+export type StoryPreference = { category?: StoryCategory; location?: StoryLocation; tags?: string[]; favourite?: boolean };
+export type StoryWithPreference = Story & { category?: StoryCategory; explicitLocation?: StoryLocation; tags?: string[]; favourite?: boolean };
 
 const storageKey = (userId: string) => 'ws_story_preferences_v1_' + userId;
+const growthKey = (userId: string) => 'ws_story_growth_seen_v1_' + userId;
+const MAX_TAGS = 5, MAX_TAG_LENGTH = 24;
+const cleanTags = (tags: unknown) => Array.isArray(tags)
+  ? [...new Set(tags.filter((t): t is string => typeof t === 'string').map(t => t.trim().slice(0, MAX_TAG_LENGTH)).filter(Boolean))].slice(0, MAX_TAGS)
+  : [];
 const validLocation = (loc: unknown): loc is StoryLocation => {
   if (!loc || typeof loc !== 'object') return false;
   const v = loc as Partial<StoryLocation>;
@@ -28,6 +33,8 @@ export async function getStoryPreferences(userId: string): Promise<Record<string
       safe[id] = {
         ...(STORY_CATEGORIES.includes(record.category as StoryCategory) ? { category: record.category } : {}),
         ...(validLocation(record.location) ? { location: record.location } : {}),
+        ...(cleanTags(record.tags).length ? { tags: cleanTags(record.tags) } : {}),
+        ...(typeof record.favourite === 'boolean' ? { favourite: record.favourite } : {}),
       };
     }
     return safe;
@@ -47,6 +54,8 @@ export async function saveStoryPreference(userId: string, storyId: string, patch
     if (!validLocation(patch.location)) throw new Error('Invalid location');
     next.location = patch.location;
   }
+  if (patch.tags !== undefined) next.tags = cleanTags(patch.tags);
+  if (patch.favourite !== undefined) next.favourite = patch.favourite;
   all[storyId] = next;
   await AsyncStorage.setItem(storageKey(userId), JSON.stringify(all));
 }
@@ -64,20 +73,40 @@ export async function clearStoryPreference(userId: string, storyId: string) {
   await AsyncStorage.setItem(storageKey(userId), JSON.stringify(all));
 }
 
+async function favouritePhotoStories() {
+  try { return new Set((await listFavourites()).map(photo => photo.story_id)); }
+  catch { return new Set<string>(); }
+}
+
+/** When each story's "has grown" card was last opened on this phone. */
+export async function getGrowthSeen(userId: string): Promise<Record<string, string>> {
+  try {
+    const raw: unknown = JSON.parse((await AsyncStorage.getItem(growthKey(userId))) ?? '{}');
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, string> : {};
+  } catch { return {}; }
+}
+export async function markGrowthSeen(userId: string, storyId: string, at: string) {
+  await AsyncStorage.setItem(growthKey(userId), JSON.stringify({ ...await getGrowthSeen(userId), [storyId]: at }));
+}
+
 /** Keeps existing real photo GPS when no explicit location was chosen. */
 export async function listStoriesWithPreferences(): Promise<StoryWithPreference[]> {
   const stories = await listStories();
   const userId = (await supabase.auth.getSession()).data.session?.user.id;
   if (!userId) return stories;
-  const saved = await getStoryPreferences(userId);
+  const [saved, hearted] = await Promise.all([getStoryPreferences(userId), favouritePhotoStories()]);
   return stories.map(story => {
     const pref = saved[story.id];
+    // A story with a hearted photo counts as a favourite until someone says otherwise.
+    const favourite = pref?.favourite ?? hearted.has(story.id);
     return pref ? {
       ...story,
       category: pref.category,
+      tags: pref.tags,
+      favourite,
       explicitLocation: pref.location,
       lat: pref.location?.lat ?? story.lat,
       lng: pref.location?.lng ?? story.lng,
-    } : story;
+    } : { ...story, favourite };
   });
 }
