@@ -1,0 +1,32 @@
+
+# Temporary files
+.expo/
+.cache/
+.gradle/
+*.log
+
+# Build outputs
+build/
+dist/
+coverage/
+android/.gradle/
+android/build/
+android/app/build/
+ios/build/
+
+# Local testing and reports
+eas-archive/
+test-results/
+playwright-report/
+
+# Large archives
+*.zip
+*.tar
+*.tar.gz
+*.apk
+*.aab
+
+# Local environment files
+.env
+.env.*
+!.env.example

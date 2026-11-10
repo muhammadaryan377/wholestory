@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Screen, H1, P, Btn, Field } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
-import { SocialAuthButtons } from '@/components/social-auth-buttons';
+import { AuthDivider, SocialAuthButtons } from '@/components/social-auth-buttons';
 import { useAuth } from '@/lib/auth';
 
 export default function SignIn() {
   const { session } = useAuth();
-  const [email, setEmail] = useState(''); const [pw, setPw] = useState(''); const [busy, setBusy] = useState(false);
+  const params = useLocalSearchParams<{ email?: string }>();
+  const [email, setEmail] = useState(params.email ?? ''); const [pw, setPw] = useState(''); const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const go = async () => {
     if (busy) return;
@@ -20,11 +21,15 @@ export default function SignIn() {
     setBusy(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pw });
+      if (error?.code === 'email_not_confirmed') {
+        router.push({ pathname: '/check-email', params: { email: email.trim() } });
+        return;
+      }
       if (error) {
         setMessage(error.message);
         return;
       }
-      router.replace('/(tabs)');
+      router.replace('/');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not log in. Check your connection and try again.');
     } finally {
@@ -43,16 +48,18 @@ export default function SignIn() {
     finally { setBusy(false); }
   };
   return (
-    <Screen>
+    <Screen style={{ paddingTop: 36 }}>
       <H1>Welcome back</H1>
       <P muted style={{ marginBottom: 16 }}>Log in to continue your stories.</P>
       <Field label="Email address" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
       <Field label="Password" value={pw} onChangeText={setPw} secureTextEntry autoComplete="current-password" />
+      <Btn kind="link" title="Forgot your password?" disabled={busy} onPress={reset} />
       {message ? <P accessibilityRole="alert" style={{ marginBottom: 12 }}>{message}</P> : null}
       <Btn title="Log in" onPress={go} busy={busy} />
-      <Btn kind="link" title="Forgot your password?" disabled={busy} onPress={reset} />
       {session?.user.is_anonymous ? <P muted style={{ marginTop: 12 }}>Signing in replaces this preview guest account. Guest stories are not transferred automatically.</P> : null}
+      <AuthDivider label="Or continue with" />
       <SocialAuthButtons onError={setMessage} />
+      <Btn title="Don't have an account? Sign up" kind="link" disabled={busy} onPress={() => router.replace('/sign-up')} />
     </Screen>
   );
 }

@@ -14,7 +14,8 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_PAYMENTS_ENABLED": "false",
-        "EXPO_PUBLIC_TEST_AUTO_GUEST": "true"
+        "EXPO_PUBLIC_TEST_AUTO_GUEST": "false",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       },
       "environment": "preview"
     },
@@ -41,7 +42,7 @@
       "env": {
         "EXPO_PUBLIC_PAYMENTS_ENABLED": "false",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true",
-        "EXPO_PUBLIC_TEST_AUTO_GUEST": "true"
+        "EXPO_PUBLIC_TEST_AUTO_GUEST": "false"
       }
     }
   },

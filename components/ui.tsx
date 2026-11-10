@@ -3,12 +3,13 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { C, F, S } from '@/lib/theme';
-import { Alert } from '@/lib/alert';
+import { Alert, friendlyMessage } from '@/lib/alert';
+import { Icon, type IconName } from './icon';
 
 export function runAction(action?: () => unknown) {
   try {
-    return Promise.resolve(action?.()).then(() => {}).catch(error => Alert.alert('Could not complete', error?.message ?? 'Please try again.'));
-  } catch (error) { Alert.alert('Could not complete', error instanceof Error ? error.message : 'Please try again.'); return Promise.resolve(); }
+    return Promise.resolve(action?.()).then(() => {}).catch(error => Alert.alert('Could not complete', friendlyMessage(error?.message)));
+  } catch (error) { Alert.alert('Could not complete', friendlyMessage(error instanceof Error ? error.message : undefined)); return Promise.resolve(); }
 }
 
 export function Thread({ width = 120 }: { width?: number }) {
@@ -23,7 +24,7 @@ export function Thread({ width = 120 }: { width?: number }) {
 export function Screen({ children, scroll = true, style }: { children: React.ReactNode; scroll?: boolean; style?: ViewStyle }) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.cream }} edges={['top']}>
-      {scroll ? <ScrollView contentContainerStyle={[{ padding: S.pad, paddingBottom: 60 }, style]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+      {scroll ? <ScrollView contentContainerStyle={[{ padding: S.pad, paddingBottom: 60 }, style]} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>{children}</ScrollView>
         : <View style={[{ flex: 1, padding: S.pad }, style]}>{children}</View>}
     </SafeAreaView>
   );
@@ -45,7 +46,7 @@ export function Btn({ title, onPress, kind = 'primary', busy, disabled, style }:
   );
 }
 export const Card = ({ children, style, onPress }: { children: React.ReactNode; style?: ViewStyle; onPress?: () => void }) =>
-  onPress ? <Pressable onPress={() => runAction(onPress)} style={({ pressed }) => [st.card, pressed && { opacity: 0.85 }, style]}>{children}</Pressable> : <View style={[st.card, style]}>{children}</View>;
+  onPress ? <Pressable accessibilityRole="button" onPress={() => runAction(onPress)} style={({ pressed }) => [st.card, pressed && { opacity: 0.85 }, style]}>{children}</Pressable> : <View style={[st.card, style]}>{children}</View>;
 
 export function Field(props: TextInputProps & { label?: string }) {
   return (
@@ -65,14 +66,18 @@ export function ToggleRow({ title, sub, value, onChange }: { title: string; sub?
 }
 export function NavRow({ title, sub, onPress, danger }: { title: string; sub?: string; onPress: () => void; danger?: boolean }) {
   return (
-    <Pressable onPress={() => runAction(onPress)} style={({ pressed }) => [st.row, pressed && { opacity: 0.7 }]}>
+    <Pressable accessibilityRole="button" onPress={() => runAction(onPress)} style={({ pressed }) => [st.row, pressed && { opacity: 0.7 }]}>
       <View style={{ flex: 1 }}><Text style={[st.rowTitle, danger && { color: C.red }]}>{title}</Text>{sub ? <Text style={st.small}>{sub}</Text> : null}</View>
       <Text style={{ color: C.faint, fontSize: 20 }}>›</Text>
     </Pressable>
   );
 }
-export function Chip({ label, on, onPress }: { label: string; on?: boolean; onPress?: () => void }) {
-  return <Pressable onPress={() => runAction(onPress)} style={[st.chip, on && { backgroundColor: C.green, borderColor: C.green }]}><Text style={[st.chipText, on && { color: C.white }]}>{label}</Text></Pressable>;
+export function Chip({ label, on, onPress, icon, soft }: { label: string; on?: boolean; onPress?: () => void; icon?: IconName; soft?: boolean }) {
+  const active = on && !soft;
+  return <Pressable onPress={() => runAction(onPress)} accessibilityRole="button" accessibilityState={{ selected: !!on }} style={[st.chip, icon && st.chipWithIcon, active && { backgroundColor: C.green, borderColor: C.green }, on && soft && { backgroundColor: '#DDE9D5', borderColor: '#DDE9D5' }]}>
+    {icon ? <Icon name={icon} size={16} color={active ? C.white : on ? C.green : C.ink} /> : null}
+    <Text style={[st.chipText, active && { color: C.white }]}>{label}</Text>
+  </Pressable>;
 }
 export function Empty({ title, body, action, onAction, secondary, onSecondary }: { title: string; body: string; action?: string; onAction?: () => void; secondary?: string; onSecondary?: () => void }) {
   return (
@@ -87,7 +92,7 @@ export function Empty({ title, body, action, onAction, secondary, onSecondary }:
 }
 export const Loading = () => <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.cream }}><ActivityIndicator color={C.green} /></View>;
 export function LoadError({ error, onRetry }: { error: string; onRetry: () => void }) {
-  return <Screen><H1>Could not load</H1><P accessibilityRole="alert">{error}</P><Btn title="Try again" onPress={onRetry} /></Screen>;
+  return <Screen><H1>Could not load</H1><P accessibilityRole="alert">{friendlyMessage(error)}</P><Btn title="Try again" onPress={onRetry} /></Screen>;
 }
 
 export const st = StyleSheet.create({
@@ -95,9 +100,9 @@ export const st = StyleSheet.create({
   h2: { fontFamily: F.serif, fontSize: 21, color: C.navy, marginBottom: 6 },
   p: { fontFamily: F.sans, fontSize: 15, color: C.ink, lineHeight: 21 },
   small: { fontFamily: F.sans, fontSize: 12.5, color: C.grey, lineHeight: 17 },
-  btn: { backgroundColor: C.green, borderRadius: 28, paddingVertical: 15, paddingHorizontal: 20, alignItems: 'center', marginVertical: 6 },
+  btn: { backgroundColor: C.green, borderRadius: 28, minHeight: 50, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center', marginVertical: 6 },
   btnOutline: { backgroundColor: C.card, borderWidth: 1, borderColor: '#D8D2C6' },
-  btnText: { fontFamily: F.serif, fontSize: 17, color: C.white },
+  btnText: { fontFamily: F.sansMedium, fontSize: 15, color: C.white },
   link: { paddingVertical: 10, alignItems: 'center' },
   linkText: { fontFamily: F.sansMedium, fontSize: 14, color: C.green, textDecorationLine: 'underline' },
   card: { backgroundColor: C.card, borderRadius: S.radius, borderWidth: 1, borderColor: C.line, padding: 14, marginBottom: S.gap },
@@ -105,6 +110,7 @@ export const st = StyleSheet.create({
   input: { backgroundColor: C.card, borderWidth: 1, borderColor: '#E0D9CD', borderRadius: 14, padding: 12, fontFamily: F.sans, fontSize: 15, color: C.ink },
   row: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.line, borderRadius: 14, padding: 14, marginBottom: 8 },
   rowTitle: { fontFamily: F.sansBold, fontSize: 15, color: C.ink },
-  chip: { borderWidth: 1, borderColor: '#D8D2C6', backgroundColor: C.card, borderRadius: 18, paddingVertical: 7, paddingHorizontal: 13, marginRight: 8, marginBottom: 8 },
+  chip: { borderWidth: 1, borderColor: '#D8D2C6', backgroundColor: C.card, borderRadius: 18, minHeight: 36, justifyContent: 'center', paddingVertical: 7, paddingHorizontal: 13, marginRight: 8, marginBottom: 8 },
+  chipWithIcon: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   chipText: { fontFamily: F.sans, fontSize: 13, color: C.ink },
 });

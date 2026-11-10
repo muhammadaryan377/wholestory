@@ -8,6 +8,7 @@ import { Screen, H1, H2, P, Field, Btn, Chip, Small } from '@/components/ui';
 import { createEvent } from '@/lib/api';
 import { C, F } from '@/lib/theme';
 import { dateInput } from '@/lib/dates';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 
 const TYPES = ['Wedding', 'Birthday', 'Holiday', 'Family gathering', 'Graduation', 'Other'];
 type M = { name: string; time: string };
@@ -24,6 +25,7 @@ export default function NewEvent() {
   const [moments, setMoments] = useState<M[]>(DEFAULTS.Wedding); const [newM, setNewM] = useState(''); const [busy, setBusy] = useState(false);
   const [cover, setCoverUri] = useState<string | null>(null);
   const pickCover = async () => { const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85, allowsEditing: true, aspect: [16, 9] }); if (!r.canceled) setCoverUri(r.assets[0].uri); };
+  useUnsavedGuard(!busy && (!!name.trim() || !!place.trim() || !!cover));
   const iso = dateInput;
   const save = async () => {
     if (busy) return;
@@ -59,8 +61,8 @@ export default function NewEvent() {
         <View key={m.name + i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 }}>
           <TextInput value={m.time} onChangeText={t => setMoments(moments.map((x, j) => (j === i ? { ...x, time: t } : x)))} placeholder="Time" placeholderTextColor={C.faint}
             style={{ width: 84, backgroundColor: C.card, borderWidth: 1, borderColor: '#E0D9CD', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6, fontFamily: F.sans, color: C.ink }} />
-          <Text style={{ flex: 1, fontSize: 15, color: C.ink }}>{m.name}</Text>
-          <Pressable onPress={() => setMoments(moments.filter((_, j) => j !== i))} hitSlop={10}><Text style={{ color: C.red }}>Remove</Text></Pressable>
+          <Text style={{ flex: 1, fontFamily: F.sans, fontSize: 15, color: C.ink }}>{m.name}</Text>
+          <Pressable onPress={() => setMoments(moments.filter((_, j) => j !== i))} hitSlop={10}><Text style={{ fontFamily: F.sansMedium, color: C.red }}>Remove</Text></Pressable>
         </View>
       ))}
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>

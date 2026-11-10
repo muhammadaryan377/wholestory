@@ -1,6 +1,6 @@
 # WholeStory: Google and Apple sign-in setup
 
-Branch: `secinf`. This implementation uses **Supabase OAuth with PKCE** for Google and Apple, and the existing `expo-web-browser` library on iOS/Android. It does **not** add provider secrets to the mobile bundle. Apple uses the browser OAuth method, not the native Apple Authentication sheet.
+The app uses **Supabase OAuth with PKCE** for Google and for Apple on Android/web. On **iOS**, Apple sign in uses Apple's native authentication sheet (`expo-apple-authentication`) and securely exchanges its identity token with Supabase through `signInWithIdToken`. The native flow uses a random nonce, SHA-256 hashing (`expo-crypto`), and preserves the name provided only at the first Apple authorization. No Apple secrets are stored in the app.
 
 ## Required setup before these buttons will work
 
@@ -9,8 +9,10 @@ Branch: `secinf`. This implementation uses **Supabase OAuth with PKCE** for Goog
 3. For Apple browser OAuth, create an Apple Services ID and Sign in with Apple signing key in Apple Developer, and register the Supabase callback URL `https://YOUR_PROJECT.supabase.co/auth/v1/callback` as the Services ID Return URL. Supply the Apple configuration in the Supabase provider. You also need the App ID/bundle identifier `app.wholestory.ios` configured in Apple Developer as appropriate. Do not commit Apple `.p8` keys or generated client secrets.
 4. In Supabase > Authentication > URL Configuration > Redirect URLs, allow **the exact redirect returned by `Linking.createURL('auth/callback')`** for your installed app (typically `wholestory://auth/callback` or the equivalent scheme form), and the HTTPS web callback `https://YOUR_WEB_HOST/auth/callback`. If necessary, use a restricted pattern such as `wholestory://**` to support Expo's native scheme variants. Supabase redirects only to allowlisted URLs.
 5. Set the real `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` in the EAS environment. Use an actual installed EAS preview/development build for native redirect testing. Expo Go is not suitable for reliably testing app-specific OAuth deep links.
-6. Verify Google and Apple in an installed test build: cancel, accept, return to app, verify a real `auth.getUser()` session, restart app and check persistence, sign out, sign in again. Check web OAuth separately if the web app is hosted. Test with separate accounts for identity isolation.
-7. For Apple browser OAuth, **rotate the Apple client secret every 6 months**, as required by Apple. Native Sign in with Apple would avoid this, but requires adding/configuring `expo-apple-authentication`, the Apple entitlement and a new signed build.
+6. Verify Google and Apple in a freshly installed signed test build: cancel, accept, return to app, verify a real `auth.getUser()` session, restart app and check persistence, sign out, sign in again. Check web OAuth separately if the web app is hosted. Test with separate accounts for identity isolation.
+7. For Apple **browser OAuth** (Android/web), **rotate the Apple client secret at least every 6 months**. Native iOS sign-in uses the App ID instead of the browser client secret.
+8. For **native iOS Apple sign-in**, Apple Developer's App ID `app.wholestory.ios` must have the Sign in with Apple capability. In Supabase Apple provider Client IDs, register `app.wholestory.ios.service,app.wholestory.ios` (Services ID first). A **new signed EAS iOS build** is required because these are native modules and entitlements; an OTA update or prior installed build cannot enable them. The `app.json` `ios.usesAppleSignIn` flag and `expo-apple-authentication` plugin are enabled.
+9. `preview` EAS builds currently enable automatic anonymous guest sign-in. To test social sign-in on those builds, navigate from Settings to Sign in or create an account, or create a test build with `EXPO_PUBLIC_TEST_AUTO_GUEST=false`.
 
 ## Preview anonymous sessions
 

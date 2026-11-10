@@ -1,9 +1,10 @@
 import { parseDate } from '@/lib/dates';
 import { supabase } from './supabase';
-import { uploadFile } from './media';
+import { clearMediaCache, uploadFile } from './media';
 import { privateIsUnlocked, PrivateLockedError } from './private-access';
 
-export type Story = { id: string; owner: string; title: string; story_date: string; hidden_from_memories: boolean; closed: boolean; private: boolean; created_at: string; updated_at: string; cover?: string | null; entryCount?: number; lat?: number | null; lng?: number | null; peopleIds?: string[]; searchText?: string };
+export type Story = { id: string; owner: string; title: string; story_date: string; hidden_from_memories: boolean; closed: boolean; private: boolean; created_at: string; updated_at: string; cover?: string | null; entryCount?: number; lat?: number | null; lng?: number | null; peopleIds?: string[]; searchText?: string; photoCount?: number; voiceCount?: number; takenDates?: string[]; activity?: StoryActivity[] };
+export type StoryActivity = { author: string; created_at: string; photos: number; voice: boolean };
 export type Entry = { id: string; story_id: string; author: string; text: string | null; transcript: string | null; audio_path: string | null; duration_ms: number | null; created_at: string; photos: StoredPhoto[]; author_name?: string; comments?: Comment[] };
 export type StoredPhoto = { id: string; path: string; lat?: number | null; lng?: number | null; caption?: string | null; taken_at?: string | null };
 export type Comment = { id: string; entry_id: string | null; post_id: string | null; author_user: string | null; guest_name: string | null; text: string; created_at: string; author_name?: string };
@@ -47,10 +48,13 @@ async function removeUploaded(bucket: 'media' | 'event-media', paths: string[]) 
 export async function myName() {
   const u = await me(); if (!u) return '';
   const data = must(await supabase.from('profiles').select('name').eq('id', u.id).maybeSingle()) as { name: string } | null;
-  return data?.name || u.user_metadata?.name || '';
+  return data?.name || u.user_metadata?.name || u.user_metadata?.full_name || '';
 }
 export async function saveName(name: string) {
   await writeProfile({ name });
+}
+export async function saveAvatarPath(path: string | null) {
+  await writeProfile({ avatar_path: path });
 }
 export async function ensureProfile() {
   const u = await me(); if (!u) throw new Error('Please sign in again');
@@ -73,10 +77,14 @@ export async function listStories(opts: { private?: boolean } = {}): Promise<Sto
   if (stories.length && opts.private && !privateIsUnlocked()) throw new PrivateLockedError();
   if (!stories.length) return stories;
   const ids = stories.map(s => s.id);
-  const entries = await readForIds<any>(ids, (chunk, from, to) => supabase.from('entries').select('id,story_id,text,transcript,entry_photos(path,sort,lat,lng,caption)').in('story_id', chunk).order('created_at', { ascending: true }).order('id').range(from, to));
+  const entries = await readForIds<any>(ids, (chunk, from, to) => supabase.from('entries').select('id,story_id,author,created_at,audio_path,text,transcript,entry_photos(path,sort,lat,lng,caption,taken_at)').in('story_id', chunk).order('created_at', { ascending: true }).order('id').range(from, to));
   for (const s of stories) {
     const es = entries.filter(e => e.story_id === s.id);
     s.entryCount = es.length;
+    s.photoCount = es.reduce((sum, e) => sum + (e.entry_photos ?? []).length, 0);
+    s.voiceCount = es.filter(e => e.audio_path).length;
+    s.takenDates = es.flatMap(e => (e.entry_photos ?? []).map((p: any) => p.taken_at).filter(Boolean));
+    s.activity = es.map(e => ({ author: e.author, created_at: e.created_at, photos: (e.entry_photos ?? []).length, voice: !!e.audio_path }));
     const first = es.find(e => (e.entry_photos ?? []).length);
     s.cover = first ? first.entry_photos.sort((a: any, b: any) => a.sort - b.sort)[0].path : null;
     const located = es.flatMap(e => e.entry_photos ?? []).find((p: any) => p.lat != null && p.lng != null);
@@ -144,6 +152,8 @@ export async function deleteEntry(e: Entry) {
 }
 export async function updateStory(id: string, patch: Partial<Pick<Story, 'title' | 'hidden_from_memories' | 'closed' | 'story_date' | 'private'>>) {
   must(await supabase.from('stories').update(patch).eq('id', id));
+  // Cached links remember whether a photo was private.
+  if (patch.private !== undefined) clearMediaCache();
 }
 export async function deleteStory(id: string) {
   const { entries } = await getStory(id);

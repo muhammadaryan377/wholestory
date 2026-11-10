@@ -1,0 +1,33 @@
+name: Check Whole Stories onboarding
+on:
+  push:
+    branches: [feature/whole-stories-intro-swipe]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Validate Expo app config
+        run: npx expo config --type public --json > /dev/null
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Existing regression tests
+        run: node scripts/test-regressions.cjs
+      - name: Onboarding state and routing tests
+        run: node scripts/test-onboarding.cjs
+      - name: Invitation tests (links, joining, expired and invalid invitations, association files)
+        run: node scripts/test-invites.cjs
+      - name: Invitation link configuration (reports what is still not configured)
+        run: node scripts/invite-association.cjs validate
+      - name: Bundle Expo web with approved local artwork
+        run: npx expo export --platform web --output-dir /tmp/whole-stories-web

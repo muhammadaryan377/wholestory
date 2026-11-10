@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Wholestory",
+    "name": "Whole Story",
     "slug": "wholestory",
     "version": "0.1.1",
     "orientation": "portrait",
@@ -15,13 +15,15 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Wholestory lets you choose photos to add to your stories and event walls.",
-        "NSCameraUsageDescription": "Wholestory lets you take a photo to add to a story.",
-        "NSMicrophoneUsageDescription": "Wholestory records your voice when you tell a story.",
-        "NSFaceIDUsageDescription": "Wholestory uses Face ID to open your private albums.",
-        "NSSpeechRecognitionUsageDescription": "Wholestory turns your voice stories into words on your phone, so you can read and search them.",
-        "NSPhotoLibraryAddUsageDescription": "Wholestory can save photos from your stories to your library."
-      }
+        "NSPhotoLibraryUsageDescription": "Whole Story lets you choose photos to add to your stories and event walls.",
+        "NSCameraUsageDescription": "Whole Story lets you take a photo to add to a story.",
+        "NSMicrophoneUsageDescription": "Whole Story records your voice when you tell a story.",
+        "NSFaceIDUsageDescription": "Whole Story uses Face ID to open your private albums.",
+        "NSSpeechRecognitionUsageDescription": "Whole Story turns your voice stories into words on your phone, so you can read and search them.",
+        "NSPhotoLibraryAddUsageDescription": "Whole Story can save photos from your stories to your library.",
+        "NSLocationWhenInUseUsageDescription": "Whole Story uses your location only when you choose to add your current place to a story."
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "app.wholestory.android",
@@ -55,25 +57,34 @@
     "plugins": [
       "expo-router",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false
+          }
+        }
+      ],
+      [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash-logo.png",
           "resizeMode": "contain",
-          "imageWidth": 240,
+          "imageWidth": 176,
           "backgroundColor": "#F8F3E8"
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Wholestory lets you choose photos to add to your stories and event walls.",
-          "cameraPermission": "Wholestory lets you take a photo to add to a story."
+          "photosPermission": "Whole Story lets you choose photos to add to your stories and event walls.",
+          "cameraPermission": "Whole Story lets you take a photo to add to a story."
         }
       ],
       [
         "expo-audio",
         {
-          "microphonePermission": "Wholestory records your voice when you tell a story."
+          "microphonePermission": "Whole Story records your voice when you tell a story."
         }
       ],
       "expo-sharing",
@@ -82,14 +93,14 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Wholestory uses Face ID to open your private albums."
+          "faceIDPermission": "Whole Story uses Face ID to open your private albums."
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "Wholestory looks at your photo library on your phone to suggest stories from trips and days out. Nothing is uploaded unless you add it.",
-          "savePhotosPermission": "Wholestory can save photos from your stories to your library.",
+          "photosPermission": "Whole Story looks at your photo library on your phone to suggest stories from trips and days out. Nothing is uploaded unless you add it.",
+          "savePhotosPermission": "Whole Story can save photos from your stories to your library.",
           "isAccessMediaLocationEnabled": true
         }
       ],
@@ -102,12 +113,21 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Wholestory records your voice when you tell a story.",
-          "speechRecognitionPermission": "Wholestory turns your voice stories into words on your phone, so you can read and search them."
+          "microphonePermission": "Whole Story records your voice when you tell a story.",
+          "speechRecognitionPermission": "Whole Story turns your voice stories into words on your phone, so you can read and search them."
         }
       ],
       "@sentry/react-native/expo",
-      "expo-asset"
+      "expo-asset",
+      "expo-apple-authentication",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Whole Story to attach your current location when you choose Add Location.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -119,9 +139,9 @@
         }
       },
       "eas": {
-        "projectId": "bc585165-0b57-4ec6-94db-31cbf6319030"
+        "projectId": "5266ca09-ed49-4a5f-b460-9cfa60c0787e"
       }
     },
-    "owner": "sabirmughal"
+    "owner": "aryan12m"
   }
 }

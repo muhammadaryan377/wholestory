@@ -42,3 +42,7 @@ yarn-error.*
 
 .env
 guest-web/config.js
+
+# local caches and EAS archive inspection output
+.npm-cache/
+eas-archive/

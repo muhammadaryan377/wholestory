@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { LoadError, Screen, H1, P, Card, Small, Empty, Btn, Loading } from '@/components/ui';
 import { listEvents } from '@/lib/api';
 import { Image } from 'expo-image';
+import { BrandHeader } from '@/components/story-chrome';
 import { eventUrl } from '@/lib/media';
 import { C, F } from '@/lib/theme';
 
@@ -15,7 +16,8 @@ export default function Events() {
   if (error) return <LoadError error={error} onRetry={reload} />;
   if (!events) return <Loading />;
   return (
-    <Screen>
+    <Screen style={{ paddingTop: 8, paddingBottom: 28 }}>
+      <BrandHeader />
       <H1>Events wall</H1>
       <P muted style={{ marginBottom: 12 }}>Life’s moments, all in one place.</P>
       {events.length ? <Btn title="Create an event wall" onPress={() => router.push('/event/new')} /> : null}

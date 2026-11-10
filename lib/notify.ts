@@ -29,11 +29,17 @@ export async function setPrefs(p: NotifyPrefs) {
 
 export async function askPermission() {
   if (Platform.OS === 'web') return false;
-  if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync('default', { name: 'Wholestory', importance: AndroidImportance.DEFAULT });
+  if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync('default', { name: 'Whole Story', importance: AndroidImportance.DEFAULT });
   const cur = await Notifications.getPermissionsAsync();
   if (cur.granted) return true;
   const r = await Notifications.requestPermissionsAsync();
   return r.granted;
+}
+
+/** True when a reminder is switched on here but the phone itself is blocking notifications. */
+export async function notificationsBlocked(prefs: NotifyPrefs) {
+  if (Platform.OS === 'web' || !(prefs.memories || prefs.dailyPrompt || prefs.fromOthers)) return false;
+  return !(await Notifications.getPermissionsAsync()).granted;
 }
 
 /** Registers this phone for notifications from other people (story additions, guest uploads). */
@@ -92,5 +98,5 @@ async function scheduleReminders(stories: Story[], prefs: NotifyPrefs) {
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: 20, minute: 0 },
     });
   }
-  if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync('default', { name: 'Wholestory', importance: AndroidImportance.DEFAULT });
+  if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync('default', { name: 'Whole Story', importance: AndroidImportance.DEFAULT });
 }

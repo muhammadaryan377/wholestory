@@ -9,6 +9,7 @@ import { C, F } from '@/lib/theme';
 import { viewUrl, eventUrl } from '@/lib/media';
 import { transcribeFile } from '@/lib/speech';
 import { Btn, Field, Small, st, runAction } from './ui';
+import { Icon } from './icon';
 import type { Draft, Picked } from '@/lib/api';
 import { photoMetadata } from '@/lib/photo-metadata';
 
@@ -19,7 +20,7 @@ export function fromAsset(a: ImagePicker.ImagePickerAsset): Picked {
   return { uri: a.uri, ...photoMetadata(a.exif ?? {}) };
 }
 
-/** A photo stored in Wholestory (private story file or event file). */
+/** A photo stored in Whole Story (private story file or event file). */
 export function Photo({ path, event, size = 96, style }: { path: string; event?: boolean; size?: number; style?: any }) {
   const [resolved, setResolved] = useState<{ path: string; uri: string } | null>(null);
   const uri = event ? eventUrl(path) : resolved?.path === path ? resolved.uri : '';
@@ -88,8 +89,8 @@ export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: 
   const camera = async () => {
     if (!Device.isDevice) {
       Alert.alert(
-        'Camera Unavailable in Simulator',
-        'The iOS Simulator does not have a camera. Would you like to select a photo from your photo library instead?',
+        'No camera on this device',
+        'Would you like to choose a photo from your library instead?',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Choose Photo', onPress: pick },
@@ -99,7 +100,7 @@ export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: 
     }
     try {
       const p = await ImagePicker.requestCameraPermissionsAsync();
-      if (!p.granted) return Alert.alert('Camera not allowed', 'You can allow the camera for Wholestory in your phone Settings.');
+      if (!p.granted) return Alert.alert('Camera not allowed', 'You can allow the camera for Whole Story in your phone Settings.');
       const r = await ImagePicker.launchCameraAsync({ quality: 0.85, exif: true });
       if (!r.canceled) setDraft(current => ({ ...current, photos: [...current.photos, ...r.assets.map(fromAsset)] }));
     } catch (err: any) {
@@ -126,7 +127,7 @@ export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: 
       return;
     }
     const perm = await AudioModule.requestRecordingPermissionsAsync();
-    if (!perm.granted) return Alert.alert('Microphone not allowed', 'You can allow the microphone for Wholestory in your phone Settings.');
+    if (!perm.granted) return Alert.alert('Microphone not allowed', 'You can allow the microphone for Whole Story in your phone Settings.');
     await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
     await recorder.prepareToRecordAsync();
     localPlayer.pause();
@@ -156,7 +157,7 @@ export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: 
             <Image source={{ uri: p.uri }} style={{ width: 74, height: 74, borderRadius: 10 }} contentFit="cover" />
             <Pressable onPress={() => setDraft({ ...draft, photos: draft.photos.filter((_, j) => j !== i) })} accessibilityLabel="Remove photo"
               style={{ position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.line }}>
-              <Text style={{ fontSize: 12, color: C.ink }}>✕</Text>
+              <Icon name="close" size={13} color={C.ink} />
             </Pressable>
           </View>
         ))}
@@ -169,7 +170,7 @@ export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: 
         {prompt ? <Text style={{ fontFamily: F.serifItalic, fontSize: 16, color: C.ink, textAlign: 'center', marginBottom: 8 }}>“{prompt}”</Text> : null}
         <Pressable onPress={toggleRec} disabled={listening} accessibilityLabel={rec.isRecording ? 'Stop recording' : 'Record your voice'}
           style={{ width: 86, height: 86, borderRadius: 43, backgroundColor: rec.isRecording ? C.red : '#C0533E', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: C.white, fontSize: rec.isRecording ? 22 : 30 }}>{rec.isRecording ? '■' : '🎙'}</Text>
+          {rec.isRecording ? <Text style={{ color: C.white, fontSize: 22 }}>■</Text> : <Icon name="mic" size={34} color={C.white} />}
         </Pressable>
         <Small style={{ marginTop: 8 }}>{rec.isRecording ? `Recording ${fmt(rec.durationMillis)} · tap to stop` : draft.audioUri ? `Recorded ${fmt(draft.durationMs)}` : 'Tap to tell it in your own voice'}</Small>
         {draft.audioUri && !rec.isRecording ? (

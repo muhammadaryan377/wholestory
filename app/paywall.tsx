@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { Alert } from '@/lib/alert';
 import { Redirect, router } from 'expo-router';
 import type { PurchasesPackage } from 'react-native-purchases';
 import { Screen, H1, P, Btn, Small, Thread } from '@/components/ui';
 import { buy, getPackages, restore, PAYMENTS_ENABLED } from '@/lib/payments';
 import { C, F } from '@/lib/theme';
+import { supabase } from '@/lib/supabase';
 
 export default function Paywall() {
   const [pkgs, setPkgs] = useState<PurchasesPackage[]>([]); const [sel, setSel] = useState(0); const [busy, setBusy] = useState(false);
@@ -19,7 +20,7 @@ export default function Paywall() {
     <Screen>
       <View style={{ alignItems: 'center' }}><Thread width={160} /></View>
       <H1>Keep every story growing</H1>
-      <P muted style={{ marginBottom: 12 }}>Everything in Wholestory, including event walls of any size.</P>
+      <P muted style={{ marginBottom: 12 }}>Everything in Whole Story, including event walls of any size.</P>
       {pkgs.map((p, i) => (
         <Pressable key={p.identifier} onPress={() => setSel(i)} style={{ borderWidth: 1.5, borderColor: sel === i ? C.green : C.line, backgroundColor: sel === i ? C.greenSoft : C.card, borderRadius: 14, padding: 14, marginBottom: 10 }}>
           <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.navy }}>{p.packageType === 'ANNUAL' ? 'Yearly' : 'Monthly'} · {p.product.priceString}</Text>
@@ -28,7 +29,8 @@ export default function Paywall() {
       ))}
       <Btn title="Subscribe" onPress={go} busy={busy} />
       <Btn kind="link" title="Restore purchases" onPress={async () => { if (await restore()) router.replace('/(tabs)'); else Alert.alert('No purchases found'); }} />
-      <Small style={{ textAlign: 'center' }}>Renews automatically until cancelled in your App Store settings.</Small>
+      <Btn kind="link" title="Log out" onPress={async () => { const { error } = await supabase.auth.signOut(); if (error) throw error; router.replace('/'); }} />
+      <Small style={{ textAlign: 'center' }}>Renews automatically until cancelled in {Platform.OS === 'android' ? 'Google Play' : 'your App Store settings'}.</Small>
     </Screen>
   );
 }

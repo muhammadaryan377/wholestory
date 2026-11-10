@@ -24,7 +24,7 @@ export default function OAuthCallback() {
       if (error) throw error;
       if (!data.session) throw new Error('Could not establish a login session.');
       window.history.replaceState(null, '', window.location.pathname);
-      router.replace('/(tabs)');
+      router.replace('/');
     };
     void complete().catch(error => setErrorText(error instanceof Error ? error.message : 'Sign-in failed.'));
   }, []);
@@ -32,7 +32,7 @@ export default function OAuthCallback() {
   useEffect(() => {
     // On native, the auth browser's own caller exchanges the code. Avoid trying
     // to consume a single-use PKCE code a second time in this route.
-    if (Platform.OS !== 'web' && session) router.replace('/(tabs)');
+    if (Platform.OS !== 'web' && session) router.replace('/');
   }, [session]);
 
   return (

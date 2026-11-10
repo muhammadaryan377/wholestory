@@ -151,6 +151,7 @@ export function Comments({
                   <Text
                     style={{
                       color: C.faint,
+                      fontFamily: F.sansMedium,
                       fontSize: 12,
                       marginLeft: 8,
                     }}
@@ -182,6 +183,7 @@ export function Comments({
                   <Text
                     style={{
                       color: C.ink,
+                      fontFamily: F.sansMedium,
                       fontSize: 13,
                     }}
                   >
@@ -214,6 +216,7 @@ export function Comments({
           accessibilityRole="alert"
           style={{
             color: C.red,
+            fontFamily: F.sans,
             fontSize: 13,
             marginBottom: 8,
           }}

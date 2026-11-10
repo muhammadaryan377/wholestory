@@ -1,7 +1,21 @@
 import { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { Btn, Small } from './ui';
+import { SocialButton } from './social-button';
+import { GoogleLogo } from './brand-logos';
+import { AppleSignInButton } from './apple-sign-in-button';
 import { signInWithSocialProvider, type SocialProvider } from '@/lib/social-auth';
+import { C, F } from '@/lib/theme';
+
+export function AuthDivider({ label }: { label: string }) {
+  return (
+    <View style={styles.divider}>
+      <View style={styles.line} />
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.line} />
+    </View>
+  );
+}
 
 export function SocialAuthButtons({ onError }: { onError: (message: string) => void }) {
   const [working, setWorking] = useState<SocialProvider | null>(null);
@@ -12,7 +26,7 @@ export function SocialAuthButtons({ onError }: { onError: (message: string) => v
     setWorking(provider);
     try {
       const complete = await signInWithSocialProvider(provider);
-      if (complete) router.replace('/(tabs)');
+      if (complete) router.replace('/');
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Unable to sign in. Please try again.');
     } finally {
@@ -22,11 +36,14 @@ export function SocialAuthButtons({ onError }: { onError: (message: string) => v
 
   return (
     <>
-      <Small style={{ textAlign: 'center', marginTop: 18, marginBottom: 6 }}>
-        Or continue securely with
-      </Small>
-      <Btn title="Continue with Apple" kind="outline" onPress={() => void login('apple')} busy={working === 'apple'} disabled={!!working} />
-      <Btn title="Continue with Google" kind="outline" onPress={() => void login('google')} busy={working === 'google'} disabled={!!working} />
+      <AppleSignInButton onPress={() => void login('apple')} busy={working === 'apple'} disabled={!!working} />
+      <SocialButton title="Continue with Google" logo={<GoogleLogo size={20} />} onPress={() => void login('google')} busy={working === 'google'} disabled={!!working} />
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 12 },
+  line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: '#D8D2C6' },
+  label: { fontFamily: F.sans, fontSize: 13, color: C.grey },
+});

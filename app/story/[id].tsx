@@ -1,16 +1,20 @@
 import { parseDate } from '@/lib/dates';
 import { useCallback, useState } from 'react';
-import { Share, View, Text, Pressable, ActionSheetIOS, Platform, Modal, ScrollView } from 'react-native';
+import { View, Text, Pressable, ActionSheetIOS, Platform, Modal, ScrollView } from 'react-native';
 import { Alert } from '@/lib/alert';
 import { router, useFocusEffect, useLocalSearchParams, Stack } from 'expo-router';
-import * as Linking from 'expo-linking';
+import { shareStoryInvite, copyStoryInvite } from '@/lib/invite-actions';
 import { LoadError, Screen, H1, Small, Card, Btn, Loading, Empty, Chip, Field, P, runAction } from '@/components/ui';
 import { Photo, VoicePlayer } from '@/components/media';
+import { Icon } from '@/components/icon';
 import { Comments } from '@/components/comments';
 import { openPhoto } from '@/lib/open';
 import { addPerson, deleteEntry, deleteStory, getStory, inviteCode, listPeople, me, peopleInStory, setPeopleInStory, updateStory, type Entry, type Person, type Story } from '@/lib/api';
 import { C, F, S } from '@/lib/theme';
 import { PrivateLockedError, usePrivateUnlocked } from '@/lib/private-access';
+import { StoryLocationPicker } from '@/components/story-location';
+import { getStoryPreferences, saveStoryPreference, clearStoryLocation, type StoryLocation } from '@/lib/story-preferences';
+import { toggleVoiceFavourite, voiceFavouriteIds } from '@/lib/voice-favourites';
 
 export default function StoryScreen() {
   const [loadError, setLoadError] = useState('');
@@ -18,12 +22,24 @@ export default function StoryScreen() {
   const unlocked = usePrivateUnlocked();
   const [data, setData] = useState<{ story: Story; entries: Entry[] } | null>(null);
   const [uid, setUid] = useState<string | null>(null);
+  const [storyPlace, setStoryPlace] = useState<StoryLocation | null>(null);
+  const [editPlace, setEditPlace] = useState(false);
+  const [voiceFavourites, setVoiceFavourites] = useState<string[]>([]);
   const [people, setPeople] = useState<Person[]>([]); const [tagged, setTagged] = useState<string[]>([]); const [tagging, setTagging] = useState(false); const [newName, setNewName] = useState('');
   const [confirmingEntryId, setConfirmingEntryId] = useState<string | null>(null);
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
   const [entryDeleteError, setEntryDeleteError] = useState<string | null>(null);
   const load = useCallback(async () => {
-    try { setLoadError(''); setData(await getStory(id)); setUid((await me())?.id ?? null); setPeople(await listPeople()); setTagged(await peopleInStory(id)); }
+    try { setLoadError(''); setData(await getStory(id));
+      const user = await me();
+      setUid(user?.id ?? null);
+      if (user) {
+        const pref = await getStoryPreferences(user.id);
+        setStoryPlace(pref[id]?.location ?? null);
+        setVoiceFavourites(await voiceFavouriteIds(user.id));
+      }
+      setPeople(await listPeople());
+      setTagged(await peopleInStory(id)); }
     catch (e) { if (e instanceof PrivateLockedError) router.replace('/private'); else setLoadError(e instanceof Error ? e.message : 'Could not load this story.'); }
   }, [id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -35,8 +51,23 @@ export default function StoryScreen() {
 
   const invite = async () => {
     const code = await inviteCode(story.id);
-    const link = Linking.createURL(`/join/${code}`);
-    await Share.share({ message: `Add your side of "${story.title}" on Wholestory: ${link}` });
+    const outcome = await shareStoryInvite(story.title, code);
+    if (outcome === 'copied') Alert.alert('Invitation copied', 'Sharing isn’t available here, so the invitation was copied. Paste it into any messaging app.');
+  };
+  const copyInvite = async () => {
+    const code = await inviteCode(story.id);
+    await copyStoryInvite(code);
+    Alert.alert('Link copied', 'You can paste this invitation into any messaging app.');
+  };
+  const updatePlace = async (next: StoryLocation | null) => {
+    if (!uid || !data || data.story.private) return;
+    try {
+      if (next) await saveStoryPreference(uid, data.story.id, { location: next });
+      else await clearStoryLocation(uid, data.story.id);
+      setStoryPlace(next);
+    } catch (error) {
+      Alert.alert('Could not save location', error instanceof Error ? error.message : 'Try again.');
+    }
   };
   const options = () => {
     const items = ['Who’s in this story?', story.hidden_from_memories ? 'Show in memories again' : 'Hide from memories', story.private ? 'Move out of Private' : 'Move to Private', 'Rename', 'Delete story', 'Cancel'];
@@ -45,11 +76,11 @@ export default function StoryScreen() {
       if (i === 1) { await updateStory(story.id, { hidden_from_memories: !story.hidden_from_memories }); load(); }
       if (i === 2) { await updateStory(story.id, { private: !story.private }); Alert.alert(story.private ? 'Moved out of Private' : 'Moved to Private', story.private ? 'It now appears in Stories again.' : 'Only you can see it, behind your passcode.'); load(); }
       if (i === 3) Alert.prompt?.('Rename story', '', async t => { if (t?.trim()) { await updateStory(story.id, { title: t.trim() }); load(); } }, 'plain-text', story.title);
-      if (i === 4) Alert.alert('Delete this story?', 'Its photos, recordings and words will be removed from Wholestory. Your originals stay on your phone.', [
+      if (i === 4) Alert.alert('Delete this story?', 'Its photos, recordings and words will be removed from Whole Story. Your originals stay on your phone.', [
         { text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { await deleteStory(story.id); router.back(); } }]);
     };
     if (Platform.OS === 'ios') ActionSheetIOS.showActionSheetWithOptions({ options: items, destructiveButtonIndex: 4, cancelButtonIndex: 5 }, i => runAction(() => act(i)));
-    else Alert.alert('Story options', '', items.slice(0, 5).map((t, i) => ({ text: t, onPress: () => act(i) })));
+    else Alert.alert('Story options', '', [...items.slice(0, 5).map((t, i) => ({ text: t, style: i === 4 ? 'destructive' as const : undefined, onPress: () => act(i) })), { text: 'Cancel', style: 'cancel' as const }]);
   };
   const removeEntry = async (e: Entry) => {
     if (deletingEntryId) return;
@@ -68,22 +99,30 @@ export default function StoryScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: '', headerRight: owner ? () => <Pressable onPress={options} hitSlop={12}><Text style={{ fontSize: 22, color: C.ink }}>⋯</Text></Pressable> : undefined }} />
+      <Stack.Screen options={{ title: '', headerRight: owner ? () => <Pressable onPress={options} hitSlop={12} accessibilityRole="button" accessibilityLabel="Story options"><Icon name="more" size={24} color={C.ink} /></Pressable> : undefined }} />
       <Screen>
         <H1>{story.title}</H1>
         {tagged.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{people.filter(p => tagged.includes(p.id)).map(p => <Chip key={p.id} label={p.name} onPress={() => router.push(`/people/${p.id}`)} />)}</View> : null}
-        <Small style={{ marginBottom: 12 }}>{story.private ? '🔒 Private · ' : ''}{entries.length} {entries.length === 1 ? 'moment' : 'moments'} · {parseDate(story.story_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}{story.hidden_from_memories ? ' · hidden from memories' : ''}</Small>
+        <Small style={{ marginBottom: 12 }}>{story.private ? 'Private · ' : ''}{entries.length} {entries.length === 1 ? 'chapter' : 'chapters'} · {parseDate(story.story_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}{story.hidden_from_memories ? ' · hidden from memories' : ''}</Small>
+        {owner && !story.private ? <>
+          <Pressable accessibilityRole="button" onPress={() => setEditPlace(v => !v)} style={{ alignSelf: 'flex-start', paddingVertical: 6 }}>
+            <Text style={{ color: C.green, fontFamily: F.sansMedium, fontSize: 13 }}>{storyPlace ? 'Edit story location' : 'Add story location (optional)'}</Text>
+          </Pressable>
+          {editPlace ? <StoryLocationPicker value={storyPlace} onChange={place => runAction(() => updatePlace(place))} /> : null}
+        </> : null}
+
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Btn title="Add to this story" onPress={() => router.push({ pathname: '/story/add/[id]', params: { id: story.id, title: story.title } })} style={{ flex: 1 }} />
           <Btn title="Tell it all" kind="outline" onPress={() => router.push({ pathname: '/story/tell', params: { id: story.id, title: story.title } })} style={{ flex: 0.7 }} />
           {owner && !story.private ? <Btn title="Invite" kind="outline" onPress={invite} style={{ flex: 0.6 }} /> : null}
         </View>
+        {owner && !story.private ? <Pressable accessibilityRole="button" accessibilityLabel="Copy invitation link" onPress={() => runAction(copyInvite)} style={{ alignSelf: 'flex-end', paddingVertical: 8, paddingHorizontal: 8 }}><Text style={{ color: C.green, fontFamily: F.sansMedium, fontSize: 13 }}>Copy invite link</Text></Pressable> : null}
         {!entries.length ? <Empty title="Nothing here yet" body="Add photos, your voice or a few words." /> : null}
         {entries.map(e => (
           <Card key={e.id}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <Small>{e.author === uid ? 'You' : e.author_name || 'Someone'} · {new Date(e.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Small>
-              {e.author === uid || owner ? <Pressable disabled={!!deletingEntryId} onPress={() => { setConfirmingEntryId(e.id); setEntryDeleteError(null); }} hitSlop={10} accessibilityRole="button" accessibilityLabel="Delete moment" accessibilityState={{ disabled: !!deletingEntryId }}><Text style={{ color: C.faint, fontSize: 16 }}>🗑</Text></Pressable> : null}
+              {e.author === uid || owner ? <Pressable disabled={!!deletingEntryId} onPress={() => { setConfirmingEntryId(e.id); setEntryDeleteError(null); }} hitSlop={10} accessibilityRole="button" accessibilityLabel="Delete moment" accessibilityState={{ disabled: !!deletingEntryId }}><Icon name="trash" size={18} color={C.faint} /></Pressable> : null}
             </View>
             {confirmingEntryId === e.id && (e.author === uid || owner) ? (
               <View style={{ backgroundColor: C.redSoft, borderRadius: 12, padding: 12, marginBottom: 10 }}>
@@ -97,11 +136,14 @@ export default function StoryScreen() {
             ) : null}
             {e.photos.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>{e.photos.map(p => (
               <Pressable key={p.id} onPress={() => openPhoto(p, story.id, story.title)} style={{ width: e.photos.length === 1 || p.caption ? '100%' : undefined }}>
-                <Photo path={p.path} size={e.photos.length === 1 || p.caption ? 300 : 96} />
+                <Photo path={p.path} size={96} style={e.photos.length === 1 || p.caption ? { width: '100%', height: 280 } : undefined} />
                 {p.caption ? <Text style={{ fontFamily: F.serifRegular, fontSize: 15, color: C.ink, marginTop: 4, marginBottom: 6 }}>{p.caption}</Text> : null}
               </Pressable>))}</View> : null}
             {e.text ? <Text style={{ fontFamily: F.serifRegular, fontSize: 17, color: C.ink, marginTop: 8, lineHeight: 24 }}>{e.text}</Text> : null}
             {e.audio_path ? <VoicePlayer path={e.audio_path} durationMs={e.duration_ms} transcript={e.transcript} /> : null}
+            {e.audio_path && uid && !story.private ? <Pressable accessibilityRole="button" accessibilityState={{ selected: voiceFavourites.includes(e.id) }} onPress={() => runAction(async () => setVoiceFavourites(await toggleVoiceFavourite(uid, e.id, !voiceFavourites.includes(e.id))))} style={{ alignSelf: 'flex-start', paddingVertical: 8 }}>
+              <Text style={{ color: C.green, fontFamily: F.sansMedium, fontSize: 13 }}>{voiceFavourites.includes(e.id) ? '♥ In Favourites' : '♡ Add voice note to Favourites'}</Text>
+            </Pressable> : null}
             <Comments items={e.comments ?? []} target={{ entry_id: e.id }} uid={uid} canModerate={owner} onChange={load} />
           </Card>
         ))}

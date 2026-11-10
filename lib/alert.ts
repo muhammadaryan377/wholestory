@@ -1,5 +1,13 @@
 import { Alert as NativeAlert, Platform, type AlertButton } from 'react-native';
 
+/** Turns transport and database wording into something a person can act on. */
+export function friendlyMessage(message: string | undefined, fallback = 'Please try again.') {
+  if (!message) return fallback;
+  if (/network request failed|failed to fetch|load failed|timed? ?out/i.test(message)) return 'Check your internet connection and try again.';
+  if (/PGRST116|coerce the result|JSON object requested/i.test(message)) return 'This is no longer available. It may have been removed, or you may not have access.';
+  return message;
+}
+
 export type Dialog = { title: string; message?: string; buttons: AlertButton[]; input?: { value: string; secure: boolean; submit: (value: string) => void } };
 let current: Dialog | null = null;
 const listeners = new Set<() => void>();
@@ -15,8 +23,8 @@ export function dismissDialog() {
   listeners.forEach(listener => listener());
 }
 export function executeDialogAction(action?: () => unknown) {
-  try { Promise.resolve(action?.()).catch(error => Alert.alert('Could not complete', error?.message ?? 'Please try again.')); }
-  catch (error) { Alert.alert('Could not complete', error instanceof Error ? error.message : 'Please try again.'); }
+  try { Promise.resolve(action?.()).catch(error => Alert.alert('Could not complete', friendlyMessage(error?.message))); }
+  catch (error) { Alert.alert('Could not complete', friendlyMessage(error instanceof Error ? error.message : undefined)); }
 }
 export const Alert = {
   alert(title: string, message?: string, buttons?: AlertButton[]) {
