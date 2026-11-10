@@ -7,13 +7,15 @@ import * as ML from 'expo-media-library/legacy';
 import type { PurchasesPackage } from 'react-native-purchases';
 import { Alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
-import { myName, saveName, saveProfileChoices } from '@/lib/api';
+import { myName, saveName, savePushToken, saveProfileChoices } from '@/lib/api';
 import { findSuggestions, libraryAllowed, countPhotos, type Suggestion } from '@/lib/suggest';
-import { saveNamedMoments, markSetupComplete } from '@/lib/moment-groups';
-import { chooseLocalProfilePhoto, readLocalProfilePhoto } from '@/lib/profile-photo';
+import { saveNamedMoments } from '@/lib/moment-groups';
+import { markSetupComplete, readOnboardingState, readProfileSetup, saveOnboardingStep } from '@/lib/onboarding';
+import { chooseLocalProfilePhoto, readLocalProfilePhoto, syncPendingProfilePhoto } from '@/lib/profile-photo';
 import { getPrefs, setPrefs } from '@/lib/notify';
 import { buy, configurePayments, getPackages, restore, PAYMENTS_ENABLED } from '@/lib/payments';
-import { Btn, Chip, Thread, ToggleRow } from '@/components/ui';
+import { supabase } from '@/lib/supabase';
+import { Btn, Chip, LoadError, Loading, Thread, ToggleRow } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { C, F } from '@/lib/theme';
 
@@ -23,6 +25,10 @@ type MomentGroup = { id: string; title: string; assets: ML.Asset[] };
 type Editing = { id: string | null; title: string; selectedIds: string[] };
 const dateLabel = (value: number) => new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 const unique = (assets: ML.Asset[]) => [...new Map(assets.map(asset => [asset.id, asset])).values()];
+const readPhotoGroups = async () => {
+  const [count, suggestions] = await Promise.all([countPhotos(), findSuggestions(30)]);
+  return { count, groups: suggestions.map((s: Suggestion): MomentGroup => ({ id: s.id.startsWith('named-') ? s.id.slice(6) : s.id, title: s.title, assets: s.assets })) };
+};
 
 function Progress({ active }: { active: number }) {
   return <View style={styles.progress}>
@@ -87,15 +93,33 @@ export default function Onboarding() {
   const [packageBusy, setPackageBusy] = useState(PAYMENTS_ENABLED);
   const [packageError, setPackageError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [resume, setResume] = useState<{ status: 'loading' | 'ready' | 'error'; error: string }>({ status: 'loading', error: '' });
+  const [resumeAttempt, setResumeAttempt] = useState(0);
 
   useEffect(() => {
     if (!userId) return;
     let alive = true;
-    Promise.all([myName(), readLocalProfilePhoto(userId)]).then(([savedName, photo]) => {
-      if (alive) { setName(savedName); setAvatar(photo); }
-    }).catch(() => {});
+    const restore = async () => {
+      const state = await readOnboardingState(userId);
+      if (state.done) { router.replace('/'); return; }
+      const [savedName, photo, details] = await Promise.all([
+        myName().catch(() => ''), readLocalProfilePhoto(userId).catch(() => null), readProfileSetup().catch(() => null),
+      ]);
+      // The photo library is on the device, so it is re-read without asking again. Without access, Moments cannot show.
+      const photos = state.step >= 2 && await libraryAllowed() ? await readPhotoGroups().catch(() => null) : null;
+      if (!alive) return;
+      const resumeStep = state.step === 2 && !photos ? 1 : state.step;
+      setName(savedName);
+      setAvatar(photo);
+      if (details && Array.isArray(details.interests) && (resumeStep > 0 || details.interests.length)) setPicked(details.interests);
+      if (details) setMorning(details.morning_memory !== false);
+      if (photos) { setTotalPhotos(photos.count); setPhotoAccess(true); setGroups(photos.groups); }
+      setStep(resumeStep);
+      setResume({ status: 'ready', error: '' });
+    };
+    restore().catch(reason => { if (alive) setResume({ status: 'error', error: reason?.message ?? 'Could not load your setup.' }); });
     return () => { alive = false; };
-  }, [userId]);
+  }, [userId, resumeAttempt]);
 
   useEffect(() => {
     if (step !== 3 || !PAYMENTS_ENABLED || !userId) return;
@@ -111,16 +135,41 @@ export default function Onboarding() {
     return () => { alive = false; };
   }, [step, userId]);
 
+  const goToStep = useCallback((next: number) => {
+    setStep(next);
+    if (userId) void saveOnboardingStep(userId, next);
+  }, [userId]);
+
+  // Signing in already replaced the login screens, so the only way before the first step is out of the account.
+  const leaveSetup = useCallback(() => {
+    Alert.alert('Leave setup?', 'Your progress is saved. Log in again to carry on from here.', [
+      { text: 'Stay', style: 'cancel' },
+      { text: 'Log out', style: 'destructive', onPress: async () => {
+        try {
+          if (name.trim()) await saveName(name.trim()).catch(() => {});
+          await saveProfileChoices(picked, morning).catch(() => {});
+          await savePushToken(null).catch(() => {});
+          const { error } = await supabase.auth.signOut();
+          if (error) throw error;
+          router.replace('/');
+        } catch (reason) {
+          Alert.alert('Could not log out', reason instanceof Error ? reason.message : 'Please try again.');
+        }
+      } },
+    ]);
+  }, [name, picked, morning]);
+
+  const goBack = useCallback(() => {
+    if (busy) return;
+    if (editor) { setEditor(null); return; }
+    if (step === 0) { leaveSetup(); return; }
+    goToStep(step === 3 && !photoAccess ? 1 : step - 1);
+  }, [busy, editor, step, photoAccess, leaveSetup, goToStep]);
+
   useFocusEffect(useCallback(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (busy) return true;
-      if (editor) { setEditor(null); return true; }
-      if (step === 0) return false;
-      setStep(previous => previous === 3 && !photoAccess ? 1 : previous - 1);
-      return true;
-    });
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { goBack(); return true; });
     return () => sub.remove();
-  }, [busy, editor, step, photoAccess]));
+  }, [goBack]));
 
   const loadGallery = async (reset = false) => {
     if (galleryBusy) return;
@@ -142,11 +191,7 @@ export default function Onboarding() {
     if (!userId || busy) return;
     setBusy(true);
     try {
-      await saveNamedMoments(userId, groups.map(group => ({
-        id: group.id, title: group.title, assetIds: group.assets.map(a => a.id),
-      })));
-      await markSetupComplete(userId);
-      router.replace('/');
+      await finishSetup();
     } catch (reason) {
       Alert.alert('Could not finish setup', reason instanceof Error ? reason.message : 'Please try again.');
     } finally { setBusy(false); }
@@ -161,33 +206,38 @@ export default function Onboarding() {
       await saveProfileChoices(picked, morning);
       const preferences = await getPrefs();
       await setPrefs({ ...preferences, memories: morning });
-      setStep(1);
+      const photoSaved = await syncPendingProfilePhoto(userId);
+      goToStep(1);
+      if (!photoSaved) Alert.alert('Photo not saved to your account yet', 'It is safe on this device, and we will try again automatically.');
     } catch (reason) {
       Alert.alert('Could not save your profile', reason instanceof Error ? reason.message : 'Try again.');
     } finally { setBusy(false); }
   };
 
   const chooseAvatar = async () => {
-    if (!userId) return;
+    if (!userId || busy) return;
+    setBusy(true);
     try {
       const pickedPhoto = await chooseLocalProfilePhoto(userId);
       if (pickedPhoto) setAvatar(pickedPhoto);
     } catch (reason) {
       Alert.alert('Could not save photo', reason instanceof Error ? reason.message : 'Try again.');
-    }
+    } finally { setBusy(false); }
   };
 
   const allowPhotos = async () => {
     if (busy) return;
+    // Coming back to this step must keep the moments already reviewed.
+    if (photoAccess) { goToStep(2); return; }
     setBusy(true);
     try {
       const allowed = await libraryAllowed(true);
       if (!allowed) return Alert.alert('Photo access not allowed', 'You can continue without photos or allow access later in Settings.');
-      const [count, suggestions] = await Promise.all([countPhotos(), findSuggestions(30)]);
-      setTotalPhotos(count);
+      const photos = await readPhotoGroups();
+      setTotalPhotos(photos.count);
       setPhotoAccess(true);
-      setGroups(suggestions.map((s: Suggestion) => ({ id: s.id.startsWith('named-') ? s.id.slice(6) : s.id, title: s.title, assets: s.assets })));
-      setStep(2);
+      setGroups(photos.groups);
+      goToStep(2);
       void loadGallery(true);
     } catch (reason) {
       Alert.alert('Could not read photos', reason instanceof Error ? reason.message : 'Try again, or select Not now.');
@@ -195,6 +245,7 @@ export default function Onboarding() {
   };
 
   const openEditor = (group?: MomentGroup) => {
+    if (!gallery.length) void loadGallery(true);
     setEditor({
       id: group?.id ?? null, title: group?.title ?? '',
       selectedIds: group?.assets.map(asset => asset.id) ?? [],
@@ -251,15 +302,16 @@ export default function Onboarding() {
     if (!packages[packageIndex] || busy) return;
     setBusy(true);
     try {
-      if (await buy(packages[packageIndex])) await completeSetupAfterPurchase();
+      if (await buy(packages[packageIndex])) await finishSetup();
     } catch (reason: any) {
       if (!reason?.userCancelled) Alert.alert('Could not subscribe', reason instanceof Error ? reason.message : 'Try again.');
     } finally { setBusy(false); }
   };
 
-  const completeSetupAfterPurchase = async () => {
+  const finishSetup = async () => {
     if (!userId) return;
-    await saveNamedMoments(userId, groups.map(group => ({ id: group.id, title: group.title, assetIds: group.assets.map(a => a.id) })));
+    // Without loaded photos the list is empty, and saving it would erase moments named before an interruption.
+    if (photoAccess) await saveNamedMoments(userId, groups.map(group => ({ id: group.id, title: group.title, assetIds: group.assets.map(a => a.id) })));
     await markSetupComplete(userId);
     router.replace('/');
   };
@@ -268,7 +320,7 @@ export default function Onboarding() {
     if (busy) return;
     setBusy(true);
     try {
-      if (await restore()) await completeSetupAfterPurchase();
+      if (await restore()) await finishSetup();
       else Alert.alert('No purchases found', 'There are no active Whole Story subscriptions to restore.');
     } catch (reason) {
       Alert.alert('Could not restore', reason instanceof Error ? reason.message : 'Try again.');
@@ -278,13 +330,14 @@ export default function Onboarding() {
   const selectedGroup = groups.find(group => group.id === editor?.id);
   const editorAssets = unique([...(selectedGroup?.assets ?? []), ...gallery]);
 
+  if (resume.status === 'loading') return <Loading />;
+  if (resume.status === 'error') return <LoadError error={resume.error} onRetry={() => { setResume({ status: 'loading', error: '' }); setResumeAttempt(value => value + 1); }} />;
+
   return <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.header}>
         <Pressable accessibilityRole="button" accessibilityLabel="Back"
-          disabled={busy || (step === 0 && !editor)}
-          onPress={() => editor ? setEditor(null) : setStep(previous => previous === 3 && !photoAccess ? 1 : Math.max(0, previous - 1))}
-          style={[styles.back, (step === 0 && !editor) && { opacity: 0 }]}>
+          disabled={busy} hitSlop={6} onPress={goBack} style={styles.back}>
           <Text style={{ fontSize: 26, color: C.green }}>‹</Text>
         </Pressable>
         <Text style={styles.brand}>Whole Story</Text>
@@ -339,12 +392,12 @@ export default function Onboarding() {
                 <Text style={{ fontFamily: F.serif, fontSize: 48, color: C.navy }}>{name.trim().charAt(0).toUpperCase() || 'W'}</Text>}
               <View style={styles.cameraBadge}><Icon name="camera" size={17} color="#FFF" /></View>
             </Pressable>
-            <Text style={styles.note}>Optional profile photo · stored on this device</Text>
+            <Text style={styles.note}>Optional profile photo · saved privately to your account</Text>
           </View>
           <Text style={styles.label}>What should we call you?</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your name" maxLength={80}
             autoCapitalize="words" autoComplete="name" placeholderTextColor={C.faint} />
-          <Text style={[styles.label, { marginTop: 18, marginBottom: 10 }]}>What kind of moments do you want to remember?</Text>
+          <Text style={[styles.label, { marginTop: 18, marginBottom: 10 }]}>What kind of moments do you want to remember? (optional)</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {INTERESTS.map(t => <Chip key={t} label={t} on={picked.includes(t)}
               onPress={() => setPicked(previous => previous.includes(t) ? previous.filter(x => x !== t) : [...previous, t])} />)}
@@ -415,10 +468,10 @@ export default function Onboarding() {
         </> : step === 0 ? <Btn title="Continue" busy={busy} onPress={saveProfile} /> :
           step === 1 ? <>
             <Btn title={busy ? 'Finding photos…' : 'Choose photos'} busy={busy} onPress={allowPhotos} />
-            <Btn title="Not now" kind="link" onPress={() => setStep(3)} />
+            <Btn title="Not now" kind="link" onPress={() => goToStep(3)} />
           </> : step === 2 ? <>
-            <Btn title="Continue" onPress={() => setStep(3)} />
-            <Btn title="Review later" kind="link" onPress={() => setStep(3)} />
+            <Btn title="Continue" onPress={() => goToStep(3)} />
+            <Btn title="Review later" kind="link" onPress={() => goToStep(3)} />
           </> : PAYMENTS_ENABLED ? <>
             <Btn title={packages[packageIndex] ? 'Continue with ' + (packages[packageIndex].packageType === 'ANNUAL' ? 'Yearly' : 'Monthly') : 'Plans unavailable'}
               busy={busy} disabled={!packages.length || packageBusy} onPress={buyPlan} />

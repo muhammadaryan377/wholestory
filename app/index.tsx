@@ -3,8 +3,8 @@ import { Redirect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/lib/auth';
 import { isConfigured, supabase } from '@/lib/supabase';
-import { Loading } from '@/components/ui';
-import { isSetupComplete } from '@/lib/moment-groups';
+import { LoadError, Loading } from '@/components/ui';
+import { useOnboardingGate } from '@/lib/use-onboarding-gate';
 import { pendingInvite } from '@/lib/pending-invite';
 
 const AUTO_GUEST = process.env.EXPO_PUBLIC_TEST_AUTO_GUEST === 'true';
@@ -14,7 +14,7 @@ export default function Index() {
   const { session, ready } = useAuth();
   const [guestAttempted, setGuestAttempted] = useState(false);
   const [introSeen, setIntroSeen] = useState<boolean | null>(null);
-  const [setupState, setSetupState] = useState<{ userId: string; done: boolean } | null>(null);
+  const gate = useOnboardingGate(session?.user.id, session?.user.is_anonymous);
   const [pendingCode, setPendingCode] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
@@ -33,16 +33,6 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    const userId = session?.user.id;
-    if (!userId || session?.user.is_anonymous) return;
-    let active = true;
-    isSetupComplete(userId).then(done => {
-      if (active) setSetupState({ userId, done });
-    }).catch(() => { if (active) setSetupState({ userId, done: true }); });
-    return () => { active = false; };
-  }, [session?.user.id, session?.user.is_anonymous]);
-
-  useEffect(() => {
     if (!AUTO_GUEST || !isConfigured || !ready || session || guestAttempted) return;
     let active = true;
     supabase.auth.signInAnonymously()
@@ -56,8 +46,9 @@ export default function Index() {
   if (!ready) return <Loading />;
   if (session) {
     if (session.user.is_anonymous) return <Redirect href="/(tabs)" />;
-    if (!setupState || setupState.userId !== session.user.id) return <Loading />;
-    if (!setupState.done) return <Redirect href="/onboarding" />;
+    if (gate.status === 'loading') return <Loading />;
+    if (gate.status === 'error') return <LoadError error={gate.error} onRetry={gate.retry} />;
+    if (gate.status === 'needed') return <Redirect href="/onboarding" />;
     if (pendingCode === undefined) return <Loading />;
     if (pendingCode) return <Redirect href={{ pathname: '/join/[code]', params: { code: pendingCode } }} />;
     return <Redirect href="/(tabs)" />;

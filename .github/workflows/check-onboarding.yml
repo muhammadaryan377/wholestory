@@ -23,6 +23,8 @@ jobs:
         run: npm run lint
       - name: Existing regression tests
         run: node scripts/test-regressions.cjs
+      - name: Onboarding state and routing tests
+        run: node scripts/test-onboarding.cjs
       - name: Invitation tests (links, joining, expired and invalid invitations, association files)
         run: node scripts/test-invites.cjs
       - name: Invitation link configuration (reports what is still not configured)

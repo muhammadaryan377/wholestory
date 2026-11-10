@@ -9,7 +9,7 @@ Deno.serve(async (request: Request) => {
   const { data, error } = await client.from('media_cleanup_queue').select('id,bucket,path').order('id').limit(100);
   if (error) return Response.json({ error: 'Could not read cleanup queue' }, { status: 500 });
   let removed = 0;
-  for (const bucket of ['media', 'event-media']) {
+  for (const bucket of ['media', 'event-media', 'avatars']) {
     const rows = (data ?? []).filter(row => row.bucket === bucket);
     if (!rows.length) continue;
     const result = await client.storage.from(bucket).remove(rows.map(row => row.path));

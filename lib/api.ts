@@ -48,10 +48,13 @@ async function removeUploaded(bucket: 'media' | 'event-media', paths: string[]) 
 export async function myName() {
   const u = await me(); if (!u) return '';
   const data = must(await supabase.from('profiles').select('name').eq('id', u.id).maybeSingle()) as { name: string } | null;
-  return data?.name || u.user_metadata?.name || '';
+  return data?.name || u.user_metadata?.name || u.user_metadata?.full_name || '';
 }
 export async function saveName(name: string) {
   await writeProfile({ name });
+}
+export async function saveAvatarPath(path: string | null) {
+  await writeProfile({ avatar_path: path });
 }
 export async function ensureProfile() {
   const u = await me(); if (!u) throw new Error('Please sign in again');

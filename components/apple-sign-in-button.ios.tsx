@@ -9,7 +9,7 @@ export function AppleSignInButton({ onPress, disabled, busy }: Props) {
       <AppleAuthentication.AppleAuthenticationButton
         buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
         buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-        cornerRadius={24}
+        cornerRadius={25}
         style={{ width: '100%', height: 50, opacity: disabled ? 0.6 : 1 }}
         onPress={() => { if (!disabled) onPress(); }}
       />

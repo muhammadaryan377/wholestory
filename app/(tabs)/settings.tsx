@@ -14,7 +14,7 @@ import { clearLocalAccountData } from '@/lib/account-data';
 import { exportMyData } from '@/lib/exporter';
 import { PAYMENTS_ENABLED } from '@/lib/payments';
 import { useAuth } from '@/lib/auth';
-import { chooseLocalProfilePhoto, readLocalProfilePhoto, removeLocalProfilePhoto } from '@/lib/profile-photo';
+import { chooseLocalProfilePhoto, readLocalProfilePhoto, removeProfilePhoto } from '@/lib/profile-photo';
 import { C, F } from '@/lib/theme';
 
 const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL ?? 'https://wholestory.app/privacy';
@@ -80,11 +80,11 @@ export default function Settings() {
   };
   const removeAvatar = () => {
     if (!userId || photoBusy) return;
-    Alert.alert('Remove profile photo?', 'This only removes the photo from your profile on this device.', [
+    Alert.alert('Remove profile photo?', 'This removes the photo from your Whole Story profile.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: async () => {
         setPhotoBusy(true);
-        try { await removeLocalProfilePhoto(userId); setAvatar(null); }
+        try { await removeProfilePhoto(userId); setAvatar(null); }
         catch (e) { Alert.alert('Could not remove photo', e instanceof Error ? e.message : 'Try again.'); }
         finally { setPhotoBusy(false); }
       } },
@@ -92,7 +92,7 @@ export default function Settings() {
   };
   const photoOptions = () => {
     if (!avatar) { void chooseAvatar(); return; }
-    Alert.alert('Profile photo', 'Stored only on this device.', [
+    Alert.alert('Profile photo', 'Saved privately to your Whole Story account.', [
       { text: 'Change photo', onPress: chooseAvatar },
       { text: 'Remove photo', style: 'destructive', onPress: removeAvatar },
       { text: 'Cancel', style: 'cancel' },

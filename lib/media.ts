@@ -12,7 +12,7 @@ const mime = (ext: string) =>
   ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', heic: 'image/heic', webp: 'image/webp', m4a: 'audio/mp4', mp4: 'video/mp4', caf: 'audio/x-caf', aac: 'audio/aac', webm: 'audio/webm', ogg: 'audio/ogg' } as Record<string, string>)[ext] ?? 'application/octet-stream';
 
 /** Uploads a local file (photo or recording) and returns its storage path. */
-export async function uploadFile(bucket: 'media' | 'event-media', folder: string, uri: string, fallbackExt = 'jpg') {
+export async function uploadFile(bucket: 'media' | 'event-media' | 'avatars', folder: string, uri: string, fallbackExt = 'jpg') {
   let ext = extOf(uri, fallbackExt);
   if (fallbackExt === 'jpg') {
     const context = ImageManipulator.manipulate(uri);

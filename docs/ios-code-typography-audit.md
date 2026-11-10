@@ -46,7 +46,7 @@ New regression asserts app title, font registration, button typography, opt-in l
 ## Known release blockers / limits
 - Five approved onboarding illustration photos and the Photos/Plan collages are now bundled locally under `assets/onboarding/`; no external stock-photo request is needed for these screens.
 - Invites require a verified public HTTPS /join route and Apple AASA/Android association files; without that configuration sharing intentionally fails with an explicit error.
-- User-assigned categories, manual story map positions and profile avatars live on this device; cross-device synchronization needs server-backed implementation.
+- User-assigned categories and manual story map positions live on this device; cross-device synchronization needs server-backed implementation. Profile avatars are saved privately to the account.
 - Individual Voice note Favourites saving isn't implemented; that filter displays an honest unavailable message.
 - Payment plans/trial are disabled in this test build; no fake billing or test charge claims.
 - GitHub Actions are static/regression tests; no native iPhone execution or TestFlight sign-off has occurred.

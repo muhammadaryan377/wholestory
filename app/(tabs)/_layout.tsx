@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/auth';
 import { C, F } from '@/lib/theme';
 import { Loading, LoadError } from '@/components/ui';
 import { Icon, type IconName } from '@/components/icon';
-import { isSetupComplete } from '@/lib/moment-groups';
+import { useOnboardingGate } from '@/lib/use-onboarding-gate';
 
 const icon = (name: IconName) => {
   function TabIcon({ color }: { color: any }) {
@@ -48,26 +48,20 @@ export default function TabLayout() {
   const userId = session?.user.id;
   const [access, setAccess] = useState<{ userId: string; paid: boolean; error: string } | null>(null);
   const accessRequest = useRef(0);
-  const [setup, setSetup] = useState<{ userId: string; done: boolean } | null>(null);
+  const gate = useOnboardingGate(userId, session?.user.is_anonymous);
   const checkAccess = useCallback(async () => {
     if (!PAYMENTS_ENABLED || !userId) return;
     const request = ++accessRequest.current;
     try { const paid = await hasAccess(userId); if (request === accessRequest.current) setAccess({ userId, paid, error: '' }); }
     catch (error) { if (request === accessRequest.current) setAccess({ userId, paid: false, error: error instanceof Error ? error.message : 'Could not check your subscription.' }); }
   }, [userId]);
-  useFocusEffect(useCallback(() => {
-    if (!userId || session?.user.is_anonymous) return;
-    let active = true;
-    isSetupComplete(userId).then(done => { if (active) setSetup({ userId, done }); })
-      .catch(() => { if (active) setSetup({ userId, done: true }); });
-    return () => { active = false; };
-  }, [userId, session?.user.is_anonymous]));
   useFocusEffect(useCallback(() => { void checkAccess(); return () => { accessRequest.current += 1; }; }, [checkAccess]));
   if (!ready) return <Loading />;
   // Not "/": that URL also belongs to this tab group's own index and would redirect back into it forever.
   if (!session) return <Redirect href="/sign-in" />;
-  if (!session.user.is_anonymous && (setup?.userId !== userId || !setup)) return <Loading />;
-  if (!session.user.is_anonymous && setup && !setup.done) return <Redirect href="/onboarding" />;
+  if (gate.status === 'loading') return <Loading />;
+  if (gate.status === 'error') return <LoadError error={gate.error} onRetry={gate.retry} />;
+  if (gate.status === 'needed') return <Redirect href="/onboarding" />;
   if (PAYMENTS_ENABLED && access?.userId !== userId) return <Loading />;
   if (PAYMENTS_ENABLED && access?.error) return <LoadError error={access.error} onRetry={checkAccess} />;
   if (PAYMENTS_ENABLED && !access?.paid) return <Redirect href="/paywall" />;

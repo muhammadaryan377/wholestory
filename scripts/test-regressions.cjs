@@ -299,22 +299,33 @@ test('finished onboarding follows the account to a new phone and does not skip i
   const cache = new Map();
   let metadata = {};
   const updates = [];
-  const supabase = { auth: {
-    getSession: async () => ({ data: { session: { user: { id: 'user', user_metadata: metadata } } } }),
-    updateUser: async patch => { updates.push(patch); metadata = { ...metadata, ...patch.data }; return { data: {}, error: null }; },
-  } };
-  const groups = load('lib/moment-groups.ts', {
-    '@react-native-async-storage/async-storage': { __esModule: true, default: { getItem: async key => cache.get(key) ?? null, setItem: async (key, value) => { cache.set(key, value); } } },
+  const supabase = {
+    auth: {
+      getSession: async () => ({ data: { session: { user: { id: 'user', user_metadata: metadata } } } }),
+      updateUser: async patch => { updates.push(patch); metadata = { ...metadata, ...patch.data }; return { data: {}, error: null }; },
+    },
+    // A server that has no user_onboarding table yet, so only the auth metadata can carry the account's state.
+    from: () => {
+      const missing = { data: null, error: { code: 'PGRST205' } };
+      const query = { select: () => query, eq: () => query, maybeSingle: async () => missing, upsert: async () => missing };
+      return query;
+    },
+  };
+  const onboarding = load('lib/onboarding.ts', {
+    '@react-native-async-storage/async-storage': { __esModule: true, default: {
+      getItem: async key => cache.get(key) ?? null, setItem: async (key, value) => { cache.set(key, value); },
+      multiSet: async pairs => pairs.forEach(([key, value]) => cache.set(key, value)),
+    } },
     './supabase': { supabase },
   });
-  assert.equal(await groups.isSetupComplete('user'), false);
-  await groups.markSetupComplete('user');
+  assert.equal((await onboarding.readOnboardingState('user')).done, false);
+  await onboarding.markSetupComplete('user');
   assert.equal(updates[0].data.setup_complete, true);
   cache.clear(); // a new phone or a reinstall
-  assert.equal(await groups.isSetupComplete('user'), true);
+  assert.equal((await onboarding.readOnboardingState('user')).done, true);
   assert.equal(cache.get('ws_onboarded_user'), '1');
   cache.clear();
-  assert.equal(await groups.isSetupComplete('someone-else'), false);
+  assert.equal((await onboarding.readOnboardingState('someone-else')).done, false);
 });
 
 test('a photo already resolved needs no more requests, and a private one stays locked', async () => {

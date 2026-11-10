@@ -12,7 +12,7 @@ type Props = {
   disabled?: boolean;
 };
 
-/** "Continue with ..." button: the provider's logo on the left, the text centred. */
+/** "Continue with ..." button: the provider's logo and the text, centred together. */
 export function SocialButton({ title, logo, dark = false, onPress, busy = false, disabled = false }: Props) {
   return (
     <Pressable
@@ -31,10 +31,10 @@ export function SocialButton({ title, logo, dark = false, onPress, busy = false,
 }
 
 const styles = StyleSheet.create({
-  button: { minHeight: 50, borderRadius: 28, marginVertical: 6, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  button: { minHeight: 50, borderRadius: 28, marginVertical: 6, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14 },
   dark: { backgroundColor: '#000000' },
   light: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DADCE0' },
-  logo: { position: 'absolute', left: 20, top: 0, bottom: 0, justifyContent: 'center' },
+  logo: { justifyContent: 'center' },
   text: { fontFamily: F.sansMedium, fontSize: 16 },
   spinner: { position: 'absolute', right: 20 },
 });

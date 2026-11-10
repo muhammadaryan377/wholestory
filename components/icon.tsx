@@ -7,6 +7,7 @@ const ICONS = {
   sliders: ['slider.horizontal.3', 'tune'],
   gear: ['gearshape', 'settings'],
   back: ['chevron.left', 'chevron_left'],
+  arrowBack: ['arrow.left', 'arrow_back'],
   forward: ['chevron.right', 'chevron_right'],
   home: ['house', 'home'],
   book: ['book', 'menu_book'],
