@@ -1,6 +1,6 @@
 import { parseDate } from '@/lib/dates';
-import { useCallback, useState } from 'react';
-import { View, Text, Pressable, ActionSheetIOS, Platform, Modal, ScrollView } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { View, Text, Pressable, ActionSheetIOS, Platform, Modal, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { Alert } from '@/lib/alert';
 import { router, useFocusEffect, useLocalSearchParams, Stack } from 'expo-router';
 import { shareStoryInvite, copyStoryInvite } from '@/lib/invite-actions';
@@ -13,41 +13,68 @@ import { addPerson, deleteEntry, deleteStory, getStory, inviteCode, listPeople, 
 import { C, F, S } from '@/lib/theme';
 import { PrivateLockedError, usePrivateUnlocked } from '@/lib/private-access';
 import { StoryLocationPicker } from '@/components/story-location';
-import { getStoryPreferences, saveStoryPreference, clearStoryLocation, type StoryLocation } from '@/lib/story-preferences';
+import { getStoryPreferences, saveStoryPreference, clearStoryLocation, type StoryCategory, type StoryLocation } from '@/lib/story-preferences';
+import { CATEGORY_TAGS, Tag } from '@/components/story-chrome';
 import { toggleVoiceFavourite, voiceFavouriteIds } from '@/lib/voice-favourites';
 
+type DetailTab = 'story' | 'photos' | 'map' | 'people';
+
 export default function StoryScreen() {
+  const { width } = useWindowDimensions();
   const [loadError, setLoadError] = useState('');
   const { id } = useLocalSearchParams<{ id: string }>();
   const unlocked = usePrivateUnlocked();
   const [data, setData] = useState<{ story: Story; entries: Entry[] } | null>(null);
   const [uid, setUid] = useState<string | null>(null);
   const [storyPlace, setStoryPlace] = useState<StoryLocation | null>(null);
-  const [editPlace, setEditPlace] = useState(false);
+  const [storyCategory, setStoryCategory] = useState<StoryCategory | undefined>(undefined);
+  const [storyTags, setStoryTags] = useState<string[]>([]);
+  const [tab, setTab] = useState<DetailTab>('story');
   const [voiceFavourites, setVoiceFavourites] = useState<string[]>([]);
-  const [people, setPeople] = useState<Person[]>([]); const [tagged, setTagged] = useState<string[]>([]); const [tagging, setTagging] = useState(false); const [newName, setNewName] = useState('');
+  const [people, setPeople] = useState<Person[]>([]);
+  const [tagged, setTagged] = useState<string[]>([]);
+  const [tagging, setTagging] = useState(false);
+  const [newName, setNewName] = useState('');
   const [confirmingEntryId, setConfirmingEntryId] = useState<string | null>(null);
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
   const [entryDeleteError, setEntryDeleteError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
-    try { setLoadError(''); setData(await getStory(id));
+    try {
+      setLoadError('');
+      setData(await getStory(id));
       const user = await me();
       setUid(user?.id ?? null);
       if (user) {
         const pref = await getStoryPreferences(user.id);
         setStoryPlace(pref[id]?.location ?? null);
+        setStoryCategory(pref[id]?.category);
+        setStoryTags(pref[id]?.tags ?? []);
         setVoiceFavourites(await voiceFavouriteIds(user.id));
       }
       setPeople(await listPeople());
-      setTagged(await peopleInStory(id)); }
-    catch (e) { if (e instanceof PrivateLockedError) router.replace('/private'); else setLoadError(e instanceof Error ? e.message : 'Could not load this story.'); }
+      setTagged(await peopleInStory(id));
+    } catch (e) {
+      if (e instanceof PrivateLockedError) router.replace('/private');
+      else setLoadError(e instanceof Error ? e.message : 'Could not load this story.');
+    }
   }, [id]);
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  const allPhotos = useMemo(() => (data?.entries ?? []).flatMap(e => e.photos), [data]);
+  const geoPhotos = useMemo(() => allPhotos.filter(p => p.lat != null && p.lng != null), [allPhotos]);
+
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
   if (!data) return <Loading />;
+
   const { story, entries } = data;
   if (story.private && !unlocked) return <Screen><H1>Private story</H1><Btn title="Unlock Private albums" onPress={() => router.replace('/private')} /></Screen>;
   const owner = uid === story.owner;
+  const heroCover = story.cover ?? allPhotos[0]?.path ?? null;
+  const photoTile = Math.floor((width - S.pad * 2 - 12) / 3);
+  const taggedPeople = people.filter(p => tagged.includes(p.id));
+  const ownerName = entries.find(e => e.author === story.owner)?.author_name ?? '';
 
   const invite = async () => {
     const code = await inviteCode(story.id);
@@ -69,13 +96,17 @@ export default function StoryScreen() {
       Alert.alert('Could not save location', error instanceof Error ? error.message : 'Try again.');
     }
   };
+  const renameStory = () => {
+    if (!owner) return;
+    Alert.prompt?.('Rename story', '', async t => { if (t?.trim()) { await updateStory(story.id, { title: t.trim() }); void load(); } }, 'plain-text', story.title);
+  };
   const options = () => {
     const items = ['Who’s in this story?', story.hidden_from_memories ? 'Show in memories again' : 'Hide from memories', story.private ? 'Move out of Private' : 'Move to Private', 'Rename', 'Delete story', 'Cancel'];
     const act = async (i: number) => {
       if (i === 0) setTagging(true);
-      if (i === 1) { await updateStory(story.id, { hidden_from_memories: !story.hidden_from_memories }); load(); }
-      if (i === 2) { await updateStory(story.id, { private: !story.private }); Alert.alert(story.private ? 'Moved out of Private' : 'Moved to Private', story.private ? 'It now appears in Stories again.' : 'Only you can see it, behind your passcode.'); load(); }
-      if (i === 3) Alert.prompt?.('Rename story', '', async t => { if (t?.trim()) { await updateStory(story.id, { title: t.trim() }); load(); } }, 'plain-text', story.title);
+      if (i === 1) { await updateStory(story.id, { hidden_from_memories: !story.hidden_from_memories }); void load(); }
+      if (i === 2) { await updateStory(story.id, { private: !story.private }); Alert.alert(story.private ? 'Moved out of Private' : 'Moved to Private', story.private ? 'It now appears in Stories again.' : 'Only you can see it, behind your passcode.'); void load(); }
+      if (i === 3) renameStory();
       if (i === 4) Alert.alert('Delete this story?', 'Its photos, recordings and words will be removed from Whole Story. Your originals stay on your phone.', [
         { text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { await deleteStory(story.id); router.back(); } }]);
     };
@@ -101,53 +132,147 @@ export default function StoryScreen() {
     <>
       <Stack.Screen options={{ title: '', headerRight: owner ? () => <Pressable onPress={options} hitSlop={12} accessibilityRole="button" accessibilityLabel="Story options"><Icon name="more" size={24} color={C.ink} /></Pressable> : undefined }} />
       <Screen>
-        <H1>{story.title}</H1>
-        {tagged.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{people.filter(p => tagged.includes(p.id)).map(p => <Chip key={p.id} label={p.name} onPress={() => router.push(`/people/${p.id}`)} />)}</View> : null}
-        <Small style={{ marginBottom: 12 }}>{story.private ? 'Private · ' : ''}{entries.length} {entries.length === 1 ? 'chapter' : 'chapters'} · {parseDate(story.story_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}{story.hidden_from_memories ? ' · hidden from memories' : ''}</Small>
-        {owner && !story.private ? <>
-          <Pressable accessibilityRole="button" onPress={() => setEditPlace(v => !v)} style={{ alignSelf: 'flex-start', paddingVertical: 6 }}>
-            <Text style={{ color: C.green, fontFamily: F.sansMedium, fontSize: 13 }}>{storyPlace ? 'Edit story location' : 'Add story location (optional)'}</Text>
-          </Pressable>
-          {editPlace ? <StoryLocationPicker value={storyPlace} onChange={place => runAction(() => updatePlace(place))} /> : null}
-        </> : null}
+        {heroCover ? (
+          <View style={styles.heroWrap}>
+            <Photo path={heroCover} size={width} style={{ width: '100%', height: 220, borderRadius: 0 }} />
+          </View>
+        ) : null}
 
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Btn title="Add to this story" onPress={() => router.push({ pathname: '/story/add/[id]', params: { id: story.id, title: story.title } })} style={{ flex: 1 }} />
-          <Btn title="Tell it all" kind="outline" onPress={() => router.push({ pathname: '/story/tell', params: { id: story.id, title: story.title } })} style={{ flex: 0.7 }} />
-          {owner && !story.private ? <Btn title="Invite" kind="outline" onPress={invite} style={{ flex: 0.6 }} /> : null}
+        <View style={styles.titleRow}>
+          <H1 style={{ flex: 1, marginBottom: 0 }}>{story.title}</H1>
+          {owner ? <Pressable onPress={renameStory} hitSlop={10} style={styles.editIcon}><Icon name="pencil" size={18} color={C.green} /></Pressable> : null}
         </View>
-        {owner && !story.private ? <Pressable accessibilityRole="button" accessibilityLabel="Copy invitation link" onPress={() => runAction(copyInvite)} style={{ alignSelf: 'flex-end', paddingVertical: 8, paddingHorizontal: 8 }}><Text style={{ color: C.green, fontFamily: F.sansMedium, fontSize: 13 }}>Copy invite link</Text></Pressable> : null}
-        {!entries.length ? <Empty title="Nothing here yet" body="Add photos, your voice or a few words." /> : null}
-        {entries.map(e => (
-          <Card key={e.id}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <Small>{e.author === uid ? 'You' : e.author_name || 'Someone'} · {new Date(e.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Small>
-              {e.author === uid || owner ? <Pressable disabled={!!deletingEntryId} onPress={() => { setConfirmingEntryId(e.id); setEntryDeleteError(null); }} hitSlop={10} accessibilityRole="button" accessibilityLabel="Delete moment" accessibilityState={{ disabled: !!deletingEntryId }}><Icon name="trash" size={18} color={C.faint} /></Pressable> : null}
-            </View>
-            {confirmingEntryId === e.id && (e.author === uid || owner) ? (
-              <View style={{ backgroundColor: C.redSoft, borderRadius: 12, padding: 12, marginBottom: 10 }}>
-                <P>Delete this moment? This removes its photos, recording and words from the story.</P>
-                {entryDeleteError ? <Text accessibilityRole="alert" style={{ color: C.red, marginTop: 8 }}>{entryDeleteError}</Text> : null}
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Btn title="Cancel" kind="outline" disabled={!!deletingEntryId} onPress={() => { setConfirmingEntryId(null); setEntryDeleteError(null); }} style={{ flex: 1 }} />
-                  <Btn title="Delete moment" kind="danger" busy={deletingEntryId === e.id} disabled={!!deletingEntryId} onPress={() => removeEntry(e)} style={{ flex: 1 }} />
+
+        <Small style={{ marginTop: 4 }}>
+          {story.private ? 'Private · ' : ''}{entries.length} {entries.length === 1 ? 'moment' : 'moments'} · {allPhotos.length} {allPhotos.length === 1 ? 'photo' : 'photos'} · {parseDate(story.story_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+          {story.hidden_from_memories ? ' · hidden from memories' : ''}
+        </Small>
+
+        {(storyCategory || storyTags.length > 0 || storyPlace) ? (
+          <View style={styles.tagRow}>
+            {storyPlace ? <Tag label="Location pinned" icon="pin" tone="blue" /> : null}
+            {storyCategory ? <Tag label={storyCategory} {...CATEGORY_TAGS[storyCategory]} /> : null}
+            {storyTags.map(t => <Tag key={t} label={t} icon="tag" tone="green" />)}
+          </View>
+        ) : null}
+
+        {taggedPeople.length > 0 ? (
+          <Pressable onPress={() => setTab('people')} style={styles.peopleRow}>
+            <View style={{ flexDirection: 'row' }}>
+              {taggedPeople.slice(0, 4).map((p, idx) => (
+                <View key={p.id} style={[styles.avatarBubble, idx > 0 && { marginLeft: -8 }]}>
+                  <Text style={styles.avatarText}>{p.name[0]?.toUpperCase()}</Text>
                 </View>
-              </View>
-            ) : null}
-            {e.photos.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>{e.photos.map(p => (
-              <Pressable key={p.id} onPress={() => openPhoto(p, story.id, story.title)} style={{ width: e.photos.length === 1 || p.caption ? '100%' : undefined }}>
-                <Photo path={p.path} size={96} style={e.photos.length === 1 || p.caption ? { width: '100%', height: 280 } : undefined} />
-                {p.caption ? <Text style={{ fontFamily: F.serifRegular, fontSize: 15, color: C.ink, marginTop: 4, marginBottom: 6 }}>{p.caption}</Text> : null}
-              </Pressable>))}</View> : null}
-            {e.text ? <Text style={{ fontFamily: F.serifRegular, fontSize: 17, color: C.ink, marginTop: 8, lineHeight: 24 }}>{e.text}</Text> : null}
-            {e.audio_path ? <VoicePlayer path={e.audio_path} durationMs={e.duration_ms} transcript={e.transcript} /> : null}
-            {e.audio_path && uid && !story.private ? <Pressable accessibilityRole="button" accessibilityState={{ selected: voiceFavourites.includes(e.id) }} onPress={() => runAction(async () => setVoiceFavourites(await toggleVoiceFavourite(uid, e.id, !voiceFavourites.includes(e.id))))} style={{ alignSelf: 'flex-start', paddingVertical: 8 }}>
-              <Text style={{ color: C.green, fontFamily: F.sansMedium, fontSize: 13 }}>{voiceFavourites.includes(e.id) ? '♥ In Favourites' : '♡ Add voice note to Favourites'}</Text>
-            </Pressable> : null}
-            <Comments items={e.comments ?? []} target={{ entry_id: e.id }} uid={uid} canModerate={owner} onChange={load} />
+              ))}
+            </View>
+            <Small style={{ flex: 1, marginLeft: 8 }}>{taggedPeople.map(p => p.name).join(', ')}</Small>
+            <Icon name="forward" size={16} color={C.grey} />
+          </Pressable>
+        ) : null}
+
+        <View style={styles.tabBar}>
+          {([
+            { key: 'story', label: 'Moments' },
+            { key: 'photos', label: `Photos (${allPhotos.length})` },
+            { key: 'map', label: 'Map' },
+            { key: 'people', label: 'People' },
+          ] as const).map(item => (
+            <Pressable key={item.key} onPress={() => setTab(item.key)} style={[styles.tabItem, tab === item.key && styles.tabItemOn]}>
+              <Text style={[styles.tabText, tab === item.key && styles.tabTextOn]}>{item.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+          <Btn title="+ Add to this story" onPress={() => router.push({ pathname: '/story/add/[id]', params: { id: story.id, title: story.title, shared: owner ? '0' : '1', owner: ownerName } })} style={{ flex: 1 }} />
+          <Btn title="Tell it all" kind="outline" onPress={() => router.push({ pathname: '/story/tell', params: { id: story.id, title: story.title } })} style={{ flex: 0.65 }} />
+          {owner && !story.private ? <Btn title="Invite" kind="outline" onPress={invite} style={{ flex: 0.55 }} /> : null}
+        </View>
+        {owner && !story.private ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Copy invitation link" onPress={() => runAction(copyInvite)} style={{ alignSelf: 'flex-end', paddingVertical: 4, paddingHorizontal: 6, marginBottom: 6 }}>
+            <Text style={{ color: C.green, fontFamily: F.sansMedium, fontSize: 13 }}>Copy invite link</Text>
+          </Pressable>
+        ) : null}
+
+        {tab === 'story' ? (
+          <>
+            {!entries.length ? <Empty title="Nothing here yet" body="Add photos, your voice or a few words." /> : null}
+            {entries.map(e => (
+              <Card key={e.id}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={styles.authorDot}><Text style={styles.authorInitial}>{(e.author === uid ? 'Y' : (e.author_name || 'S')[0]).toUpperCase()}</Text></View>
+                    <View>
+                      <Text style={styles.authorName}>{e.author === uid ? 'You' : e.author_name || 'Someone'}</Text>
+                      <Small>{new Date(e.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Small>
+                    </View>
+                  </View>
+                  {e.author === uid || owner ? <Pressable disabled={!!deletingEntryId} onPress={() => { setConfirmingEntryId(e.id); setEntryDeleteError(null); }} hitSlop={10} accessibilityRole="button" accessibilityLabel="Delete moment" accessibilityState={{ disabled: !!deletingEntryId }}><Icon name="trash" size={18} color={C.faint} /></Pressable> : null}
+                </View>
+                {confirmingEntryId === e.id && (e.author === uid || owner) ? (
+                  <View style={{ backgroundColor: C.redSoft, borderRadius: 12, padding: 12, marginBottom: 10 }}>
+                    <P>Delete this moment? This removes its photos, recording and words from the story.</P>
+                    {entryDeleteError ? <Text accessibilityRole="alert" style={{ color: C.red, marginTop: 8 }}>{entryDeleteError}</Text> : null}
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <Btn title="Cancel" kind="outline" disabled={!!deletingEntryId} onPress={() => { setConfirmingEntryId(null); setEntryDeleteError(null); }} style={{ flex: 1 }} />
+                      <Btn title="Delete moment" kind="danger" busy={deletingEntryId === e.id} disabled={!!deletingEntryId} onPress={() => removeEntry(e)} style={{ flex: 1 }} />
+                    </View>
+                  </View>
+                ) : null}
+                {e.photos.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>{e.photos.map(p => (
+                  <Pressable key={p.id} onPress={() => openPhoto(p, story.id, story.title)} style={{ width: e.photos.length === 1 || p.caption ? '100%' : undefined }}>
+                    <Photo path={p.path} size={96} style={e.photos.length === 1 || p.caption ? { width: '100%', height: 280 } : undefined} />
+                    {p.caption ? <Text style={{ fontFamily: F.serifRegular, fontSize: 15, color: C.ink, marginTop: 4, marginBottom: 6 }}>{p.caption}</Text> : null}
+                  </Pressable>))}</View> : null}
+                {e.text ? <Text style={{ fontFamily: F.serifRegular, fontSize: 17, color: C.ink, marginTop: 8, lineHeight: 24 }}>{e.text}</Text> : null}
+                {e.audio_path ? <VoicePlayer path={e.audio_path} durationMs={e.duration_ms} transcript={e.transcript} /> : null}
+                {e.audio_path && uid && !story.private ? <Pressable accessibilityRole="button" accessibilityState={{ selected: voiceFavourites.includes(e.id) }} onPress={() => runAction(async () => setVoiceFavourites(await toggleVoiceFavourite(uid, e.id, !voiceFavourites.includes(e.id))))} style={{ alignSelf: 'flex-start', paddingVertical: 8 }}>
+                  <Text style={{ color: C.green, fontFamily: F.sansMedium, fontSize: 13 }}>{voiceFavourites.includes(e.id) ? '♥ In Favourites' : '♡ Add voice note to Favourites'}</Text>
+                </Pressable> : null}
+                <Comments items={e.comments ?? []} target={{ entry_id: e.id }} uid={uid} canModerate={owner} onChange={load} />
+              </Card>
+            ))}
+          </>
+        ) : null}
+
+        {tab === 'photos' ? (
+          allPhotos.length ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {allPhotos.map(p => (
+                <Pressable key={p.id} onPress={() => openPhoto(p, story.id, story.title)}>
+                  <Photo path={p.path} size={photoTile} />
+                </Pressable>
+              ))}
+            </View>
+          ) : <Empty title="No photos yet" body="Add photos to see them in this gallery." />
+        ) : null}
+
+        {tab === 'map' ? (
+          <Card>
+            <Text style={styles.sectionTitle}>Story location</Text>
+            <Small style={{ marginBottom: 10 }}>
+              {storyPlace ? `Pinned at ${storyPlace.lat.toFixed(4)}, ${storyPlace.lng.toFixed(4)}` : geoPhotos.length ? `${geoPhotos.length} photos include GPS metadata.` : 'No location added yet.'}
+            </Small>
+            {owner && !story.private ? <StoryLocationPicker value={storyPlace} onChange={place => runAction(() => updatePlace(place))} /> : null}
+            <Btn title="Open on Stories Map" kind="outline" onPress={() => router.navigate('/map')} style={{ marginTop: 8 }} />
           </Card>
-        ))}
+        ) : null}
+
+        {tab === 'people' ? (
+          <Card>
+            <Text style={styles.sectionTitle}>People in this story</Text>
+            {taggedPeople.length ? taggedPeople.map(p => (
+              <Pressable key={p.id} onPress={() => router.push(`/people/${p.id}`)} style={styles.personListRow}>
+                <View style={styles.avatarBubble}><Text style={styles.avatarText}>{p.name[0]?.toUpperCase()}</Text></View>
+                <Text style={[styles.authorName, { flex: 1 }]}>{p.name}</Text>
+                <Icon name="forward" size={16} color={C.grey} />
+              </Pressable>
+            )) : <Small style={{ marginBottom: 10 }}>No people tagged in this story yet.</Small>}
+            {owner ? <Btn title="Tag people" kind="outline" onPress={() => setTagging(true)} style={{ marginTop: 8 }} /> : null}
+          </Card>
+        ) : null}
       </Screen>
+
       <Modal visible={tagging} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setTagging(false)}>
         <ScrollView style={{ backgroundColor: C.cream }} contentContainerStyle={{ padding: S.pad }} keyboardShouldPersistTaps="handled">
           <H1>Who’s in this story?</H1>
@@ -155,9 +280,29 @@ export default function StoryScreen() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{people.map(p => <Chip key={p.id} label={p.name} on={tagged.includes(p.id)} onPress={() => setTagged(tagged.includes(p.id) ? tagged.filter(x => x !== p.id) : [...tagged, p.id])} />)}</View>
           <Field label="Someone new" value={newName} onChangeText={setNewName} placeholder="Their name" />
           <Btn title="Add person" kind="outline" onPress={async () => { if (!newName.trim()) return; const pid = await addPerson(newName); setNewName(''); setPeople(await listPeople()); setTagged([...tagged, pid]); }} />
-          <Btn title="Done" onPress={async () => { await setPeopleInStory(story.id, tagged); setTagging(false); load(); }} />
+          <Btn title="Done" onPress={async () => { await setPeopleInStory(story.id, tagged); setTagging(false); void load(); }} />
         </ScrollView>
       </Modal>
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  heroWrap: { marginHorizontal: -S.pad, marginTop: -S.pad, marginBottom: 14, backgroundColor: '#E8E0D5' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  editIcon: { padding: 6 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  peopleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10, paddingVertical: 4 },
+  avatarBubble: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.greenSoft, borderWidth: 1.5, borderColor: C.cream, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: F.serif, fontSize: 14, color: C.green },
+  tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderColor: C.line, marginTop: 14, marginBottom: 12 },
+  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 2, borderColor: 'transparent' },
+  tabItemOn: { borderColor: C.green },
+  tabText: { fontFamily: F.sansMedium, fontSize: 13, color: C.grey },
+  tabTextOn: { color: C.navy, fontFamily: F.sansBold },
+  authorDot: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.greenSoft, alignItems: 'center', justifyContent: 'center' },
+  authorInitial: { fontFamily: F.serif, fontSize: 15, color: C.green },
+  authorName: { fontFamily: F.sansBold, fontSize: 14, color: C.navy },
+  sectionTitle: { fontFamily: F.serif, fontSize: 19, color: C.navy, marginBottom: 4 },
+  personListRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderColor: C.line },
+});

@@ -24,7 +24,7 @@ export default function TellTheWholeStory() {
   const [title, setTitle] = useState('');
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [pinned, setPinned] = useState(false); const [busy, setBusy] = useState(false);
-  useUnsavedGuard(!busy && (draft.photos.length > 0 || !!draft.text.trim() || !!draft.audioUri));
+  const allowExit = useUnsavedGuard(!busy && (draft.photos.length > 0 || !!draft.text.trim() || !!draft.audioUri));
   const words = (draft.transcript || draft.text).trim();
   const pin = () => {
     if (draft.recording || draft.processingAudio) return Alert.alert('Finish your recording first', 'Stop recording and wait for the words before continuing.');
@@ -39,8 +39,8 @@ export default function TellTheWholeStory() {
     setBusy(true);
     try {
       const d = { ...draft };
-      if (id) { await addToStory(id, d); router.replace(`/story/${id}`); }
-      else { const date = (draft.photos.find(p => p.takenAt)?.takenAt ? localDate(parseDate(draft.photos.find(p => p.takenAt)!.takenAt!)) : null) ?? localDate(); const sid = await createStory(title, date, d); router.replace(`/story/${sid}`); }
+      if (id) { await addToStory(id, d); allowExit(); router.replace(`/story/${id}`); }
+      else { const date = (draft.photos.find(p => p.takenAt)?.takenAt ? localDate(parseDate(draft.photos.find(p => p.takenAt)!.takenAt!)) : null) ?? localDate(); const sid = await createStory(title, date, d); allowExit(); router.replace(`/story/${sid}`); }
     } catch (e: any) { Alert.alert('Could not save', e.message ?? ''); } finally { setBusy(false); }
   };
   if (pinned) return (

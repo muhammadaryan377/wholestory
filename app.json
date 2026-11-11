@@ -23,7 +23,8 @@
         "NSPhotoLibraryAddUsageDescription": "Whole Story can save photos from your stories to your library.",
         "NSLocationWhenInUseUsageDescription": "Whole Story uses your location only when you choose to add your current place to a story."
       },
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "appleTeamId": "BX4P5JB947"
     },
     "android": {
       "package": "app.wholestory.android",

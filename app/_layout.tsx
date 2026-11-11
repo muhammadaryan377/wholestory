@@ -49,8 +49,6 @@ function RootLayout() {
   );
 }
 
-const ONE_PER_ID = (_name: string, params: Record<string, unknown>) => String(params.id ?? '');
-
 function AppStack() {
   const { session, ready } = useAuth();
   if (!ready) return <Loading />;
@@ -71,21 +69,24 @@ function AppStack() {
             layout checks the session itself and redirects signed-out users to /sign-in. */}
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Protected guard={!!session}>
-        <Stack.Screen name="story/new" dangerouslySingular options={{ title: 'New story', presentation: 'modal' }} />
-        <Stack.Screen name="story/[id]" dangerouslySingular={ONE_PER_ID} options={{ title: '' }} />
+        <Stack.Screen name="story/new" options={{ title: 'New story', presentation: 'modal' }} />
+        <Stack.Screen name="story/[id]" options={{ title: '' }} />
         <Stack.Screen name="story/add/[id]" options={{ title: 'Add to this story', presentation: 'modal' }} />
-        <Stack.Screen name="event/new" dangerouslySingular options={{ title: 'Create an event wall', presentation: 'modal' }} />
-        <Stack.Screen name="event/[id]" dangerouslySingular={ONE_PER_ID} options={{ title: '' }} />
-        <Stack.Screen name="hard-memories" dangerouslySingular options={{ title: 'Hard memories' }} />
-        <Stack.Screen name="private" dangerouslySingular options={{ title: 'Private' }} />
-        <Stack.Screen name="story/tell" dangerouslySingular options={{ title: 'Tell the whole story', presentation: 'modal' }} />
-        <Stack.Screen name="photo" dangerouslySingular options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="event/new" options={{ title: 'Create an event wall', presentation: 'modal' }} />
+        <Stack.Screen name="event/[id]" options={{ title: '' }} />
+        <Stack.Screen name="hard-memories" options={{ title: 'Hard memories' }} />
+        <Stack.Screen name="private" options={{ title: 'Private' }} />
+        <Stack.Screen name="story/tell" options={{ title: 'Tell the whole story', presentation: 'modal' }} />
+        <Stack.Screen name="photo" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="event/schedule/[id]" options={{ title: 'Schedule' }} />
-        <Stack.Screen name="people/index" dangerouslySingular options={{ title: 'People' }} />
-        <Stack.Screen name="people/[id]" dangerouslySingular={ONE_PER_ID} options={{ title: '' }} />
-        <Stack.Screen name="suggestions" dangerouslySingular options={{ title: 'Suggested stories' }} />
-        <Stack.Screen name="notifications" dangerouslySingular options={{ title: 'Notifications' }} />
+        <Stack.Screen name="people/index" options={{ title: 'People' }} />
+        <Stack.Screen name="people/[id]" options={{ title: '' }} />
+        <Stack.Screen name="suggestions" options={{ title: 'Suggested stories' }} />
+        <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
+        <Stack.Screen name="privacy-settings" options={{ title: 'Privacy & permissions' }} />
+        <Stack.Screen name="data-storage" options={{ title: 'Data & storage' }} />
+        <Stack.Screen name="appearance" options={{ title: 'Appearance & language' }} />
         <Stack.Screen name="paywall" options={{ headerShown: false, gestureEnabled: false }} />
         </Stack.Protected>
       </Stack>

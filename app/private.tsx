@@ -6,6 +6,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Screen, H1, P, Btn, Card, Small, Empty, Field, runAction } from '@/components/ui';
 import { Photo } from '@/components/media';
+import { Icon } from '@/components/icon';
 import { listStories, type Story } from '@/lib/api';
 import { C, F } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
@@ -20,31 +21,35 @@ const Dots = ({ n }: { n: number }) => (
 );
 function Keypad({ onDigit, onBack, onClear }: { onDigit: (d: string) => void; onBack: () => void; onClear: () => void }) {
   const { width, height } = useWindowDimensions();
-  // Keep a 3-column grid and large round keys on small and large iPhones.
-  const size = Math.min(92, Math.max(62, (width - 84) / 3.35), Math.max(62, (height - 350) / 4.8));
-  const gap = Math.min(22, Math.max(10, size * 0.18));
-  const keys = [
-    { n: '1', letters: '' }, { n: '2', letters: 'ABC' }, { n: '3', letters: 'DEF' },
-    { n: '4', letters: 'GHI' }, { n: '5', letters: 'JKL' }, { n: '6', letters: 'MNO' },
-    { n: '7', letters: 'PQRS' }, { n: '8', letters: 'TUV' }, { n: '9', letters: 'WXYZ' },
-    { n: '*', letters: '' }, { n: '0', letters: '+' }, { n: '#', letters: '' },
+  // Explicit 3x4 rows prevent Yoga flexWrap rounding from collapsing to 2 columns.
+  const size = Math.floor(Math.min(82, Math.max(58, (width - 96) / 3.5), Math.max(58, (height - 410) / 4.7)));
+  const gap = Math.floor(Math.min(20, Math.max(10, size * 0.2)));
+  const rows = [
+    [{ n: '1', letters: '' }, { n: '2', letters: 'ABC' }, { n: '3', letters: 'DEF' }],
+    [{ n: '4', letters: 'GHI' }, { n: '5', letters: 'JKL' }, { n: '6', letters: 'MNO' }],
+    [{ n: '7', letters: 'PQRS' }, { n: '8', letters: 'TUV' }, { n: '9', letters: 'WXYZ' }],
+    [{ n: '*', letters: '' }, { n: '0', letters: '+' }, { n: '#', letters: '' }],
   ];
   return (
-    <View style={{ alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', width: size * 3 + gap * 2, columnGap: gap, rowGap: gap, marginTop: 8 }}>
-      {keys.map(({ n, letters }) => (
-        <Pressable key={n} accessibilityRole="button"
-          accessibilityLabel={n === '*' ? 'Clear PIN' : n === '#' ? 'Delete last digit' : `Digit ${n}`}
-          accessibilityHint={n === '*' ? 'Clear entered digits' : n === '#' ? 'Erase one digit' : undefined}
-          onPress={() => runAction(() => n === '*' ? onClear() : n === '#' ? onBack() : onDigit(n))}
-          style={({ pressed }) => ({
-            width: size, height: size, borderRadius: size / 2,
-            backgroundColor: pressed ? '#D3D3D3' : '#E9E9E9',
-            alignItems: 'center', justifyContent: 'center',
-            opacity: pressed ? 0.8 : 1,
-          })}>
-          <Text style={{ color: '#101010', fontFamily: F.sans, fontSize: size * 0.45, lineHeight: size * 0.53 }}>{n}</Text>
-          {letters ? <Text style={{ color: '#262626', fontFamily: F.sansBold, fontSize: Math.max(10, size * 0.14), letterSpacing: 2, marginTop: -2 }}>{letters}</Text> : null}
-        </Pressable>
+    <View style={{ alignSelf: 'center', gap, marginTop: 6 }}>
+      {rows.map((row, rowIndex) => (
+        <View key={rowIndex} style={{ flexDirection: 'row', justifyContent: 'center', gap }}>
+          {row.map(({ n, letters }) => (
+            <Pressable key={n} accessibilityRole="button"
+              accessibilityLabel={n === '*' ? 'Clear PIN' : n === '#' ? 'Delete last digit' : `Digit ${n}`}
+              accessibilityHint={n === '*' ? 'Clear entered digits' : n === '#' ? 'Erase one digit' : undefined}
+              onPress={() => runAction(() => n === '*' ? onClear() : n === '#' ? onBack() : onDigit(n))}
+              style={({ pressed }) => ({
+                width: size, height: size, borderRadius: size / 2,
+                backgroundColor: pressed ? '#D3D3D3' : '#E9E9E9',
+                alignItems: 'center', justifyContent: 'center',
+                opacity: pressed ? 0.8 : 1,
+              })}>
+              <Text style={{ color: '#101010', fontFamily: F.sans, fontSize: size * 0.44, lineHeight: size * 0.52 }}>{n}</Text>
+              {letters ? <Text style={{ color: '#262626', fontFamily: F.sansBold, fontSize: Math.max(9, size * 0.14), letterSpacing: 1.5, marginTop: -2 }}>{letters}</Text> : null}
+            </Pressable>
+          ))}
+        </View>
       ))}
     </View>
   );
@@ -62,6 +67,7 @@ export default function Private() {
   const writeEntry = useCallback((next: string) => { entryRef.current = next; setEntry(next); }, []);
   const verifying = useRef(false);
   const open = usePrivateUnlocked(); const [stories, setStories] = useState<Story[]>([]);
+  const [search, setSearch] = useState('');
   const [resetting, setResetting] = useState(false); const [password, setPassword] = useState('');
   const [resetBusy, setResetBusy] = useState(false); const [error, setError] = useState('');
   useEffect(() => {
@@ -119,7 +125,11 @@ export default function Private() {
   if (!open) return (
     <Screen>
       <H1 style={{ textAlign: 'center', marginTop: 8 }}>{saved ? 'Private' : 'Set Privacy PIN'}</H1>
-      <P muted style={{ textAlign: 'center' }}>{saved ? 'Enter your passcode' : first ? 'Enter the same passcode again' : 'Choose a 6-digit passcode for your private albums. It stays on this phone.'}</P>
+      <P muted style={{ textAlign: 'center', marginBottom: 14 }}>{saved ? 'Your private memories are kept secure and accessible only to you.' : first ? 'Enter the same passcode again' : 'Choose a 6-digit passcode for your private albums. It stays on this phone.'}</P>
+      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: C.greenSoft, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 6 }}>
+        <Icon name="lock" size={28} color={C.green} />
+      </View>
+      {saved ? <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.navy, textAlign: 'center', marginTop: 6 }}>Enter your passcode</Text> : null}
       <Dots n={entry.length} />
       <Keypad onDigit={digit} onBack={() => writeEntry(entryRef.current.slice(0, -1))} onClear={() => writeEntry('')} />
       {saved ? <Btn kind="link" title={Platform.OS === 'ios' ? 'Use Face ID' : 'Use fingerprint'} onPress={faceId} /> : null}
@@ -133,17 +143,26 @@ export default function Private() {
       {error ? <P accessibilityRole="alert">{error}</P> : null}
     </Screen>
   );
+  const shown = search.trim() ? stories.filter(s => s.title.toLowerCase().includes(search.trim().toLowerCase())) : stories;
   return (
     <Screen>
-      <H1>Private</H1>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <H1 style={{ marginBottom: 0 }}>Private</H1>
+        <Pressable onPress={() => router.push({ pathname: '/story/new', params: { private: '1' } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.green, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9 }}>
+          <Icon name="plus" size={16} color="#FFF" />
+          <Text style={{ fontFamily: F.sansMedium, fontSize: 13, color: '#FFF' }}>New album</Text>
+        </Pressable>
+      </View>
       {error ? <P accessibilityRole="alert">{error}</P> : null}
-      <P muted style={{ marginBottom: 12 }}>Only you can see these. They never appear in memories, the map or reminders.</P>
-      <Btn title="New private story" onPress={() => router.push({ pathname: '/story/new', params: { private: '1' } })} />
+      <P muted style={{ marginBottom: 10 }}>Only you can see these. They never appear in memories, the map or reminders.</P>
+      {stories.length > 0 ? <Field value={search} onChangeText={setSearch} placeholder="Search private albums…" /> : null}
       {!stories.length ? <Empty title="No private stories yet" body="Make a new one here, or move a story in from its ⋯ menu." /> : null}
-      {stories.map(s => (
+      {stories.length > 0 && !shown.length ? <Small style={{ textAlign: 'center', marginVertical: 14 }}>No matching private albums.</Small> : null}
+      {shown.map(s => (
         <Card key={s.id} onPress={() => router.push(`/story/${s.id}`)} style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
           {s.cover ? <Photo path={s.cover} size={64} /> : <View style={{ width: 64, height: 64, borderRadius: 10, backgroundColor: '#E9E4D9' }} />}
           <View style={{ flex: 1 }}><Text style={{ fontFamily: F.serif, fontSize: 17, color: C.navy }}>{s.title}</Text><Small>{s.entryCount ?? 0} {s.entryCount === 1 ? 'chapter' : 'chapters'} · Private</Small></View>
+          <Icon name="forward" size={18} color={C.grey} />
         </Card>
       ))}
     </Screen>

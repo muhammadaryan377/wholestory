@@ -170,24 +170,27 @@ export default function Settings() {
         <Btn title="Sign in or create an account" kind="outline" onPress={() => router.push('/sign-in')} />
       </> : null}
 
+      <SettingsGroup title="Preferences">
+        {PAYMENTS_ENABLED ? <SettingsRow icon="card" title="Subscription & billing" sub={SUBSCRIPTION.sub} onPress={() => openLink(SUBSCRIPTION.url, 'Open your subscriptions in your phone’s app store.')} /> : null}
+        <SettingsRow icon="bell" title="Notifications" sub="Event updates, memories and reminders" onPress={() => router.push('/notifications')} />
+        <SettingsRow icon="shield" title="Privacy & permissions" sub="Private vault, hard memories and legal" onPress={() => router.push('/privacy-settings')} />
+        <SettingsRow icon="calendar" title="Event settings" sub="Manage your event walls and QR access" onPress={() => router.navigate('/(tabs)/events')} />
+        <SettingsRow icon="download" title={exporting || 'Data & storage'} sub="Manage your photos, stories and export" onPress={() => router.push('/data-storage')} />
+        <SettingsRow icon="sliders" title="Appearance & language" sub="Theme, language and date format" onPress={() => router.push('/appearance')} />
+      </SettingsGroup>
+
       <SettingsGroup title="Your stories">
-        <SettingsRow icon="bell" title="Notifications" sub="Memories, reminders and updates from others" onPress={() => router.push('/notifications')} />
         <SettingsRow icon="people" title="People" sub="Everyone in your stories" onPress={() => router.push('/people')} />
         <SettingsRow icon="heart" title="Favourites" sub="Photos, stories and voice notes" onPress={() => router.navigate('/favourites')} />
         <SettingsRow icon="lock" title="Private albums" sub={PRIVATE_LOCK} onPress={() => router.push('/private')} />
         <SettingsRow icon="download" title={exporting || 'Download your data'} sub="Stories, photos, recordings and event walls" onPress={download} disabled={!!exporting} />
-        {PAYMENTS_ENABLED ? <SettingsRow icon="card" title="Subscription" sub={SUBSCRIPTION.sub} onPress={() => openLink(SUBSCRIPTION.url, 'Open your subscriptions in your phone’s app store.')} /> : null}
       </SettingsGroup>
 
-      <SettingsGroup title="Privacy">
-        <SettingsRow icon="memories" title="Hard memories" sub="Choose which stories come back in memories" onPress={() => router.push('/hard-memories')} />
-        <SettingsRow icon="shield" title="Privacy Policy" onPress={() => openLink(PRIVACY_URL, PRIVACY_URL)} />
-        <SettingsRow icon="document" title="Terms of Use" onPress={() => openLink(TERMS_URL, TERMS_URL)} />
-      </SettingsGroup>
-
-      <SettingsGroup title="Help">
+      <SettingsGroup title="Help & support">
         <SettingsRow icon="play" title="View introduction" sub="Replay the five photo-led welcome screens" onPress={() => router.push('/welcome')} />
         <SettingsRow icon="mail" title="Contact us or send feedback" sub={SUPPORT} onPress={() => openLink(`mailto:${SUPPORT}?subject=${encodeURIComponent('Whole Story feedback')}`, `No email app was found. You can write to us at ${SUPPORT}.`)} />
+        <SettingsRow icon="shield" title="Privacy Policy" onPress={() => openLink(PRIVACY_URL, PRIVACY_URL)} />
+        <SettingsRow icon="document" title="Terms of Use" onPress={() => openLink(TERMS_URL, TERMS_URL)} />
       </SettingsGroup>
 
       <SettingsGroup>

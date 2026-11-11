@@ -67,7 +67,7 @@ export function VoicePlayer({ path, event, durationMs, transcript }: { path: str
 }
 
 /** Pick photos, record or type: used for new stories, story updates and event posts. */
-export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; prompt?: string }) {
+export function Composer({ draft, setDraft, prompt, hidePhotos, hideVoice, hideText }: { draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>>; prompt?: string; hidePhotos?: boolean; hideVoice?: boolean; hideText?: boolean }) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const rec = useAudioRecorderState(recorder, 250);
   const localPlayer = useAudioPlayer(draft.audioUri ? { uri: draft.audioUri } : null);
@@ -151,22 +151,24 @@ export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: 
 
   return (
     <View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-        {draft.photos.map((p, i) => (
-          <View key={p.uri + i}>
-            <Image source={{ uri: p.uri }} style={{ width: 74, height: 74, borderRadius: 10 }} contentFit="cover" />
-            <Pressable onPress={() => setDraft({ ...draft, photos: draft.photos.filter((_, j) => j !== i) })} accessibilityLabel="Remove photo"
-              style={{ position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.line }}>
-              <Icon name="close" size={13} color={C.ink} />
-            </Pressable>
-          </View>
-        ))}
-      </View>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Btn title="Choose photos" kind="outline" onPress={pick} style={{ flex: 1 }} />
-        <Btn title="Camera" kind="outline" onPress={camera} style={{ flex: 0.6 }} />
-      </View>
-      <View style={[st.card, { alignItems: 'center', marginTop: 8 }]}>
+      {!hidePhotos ? <>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+          {draft.photos.map((p, i) => (
+            <View key={p.uri + i}>
+              <Image source={{ uri: p.uri }} style={{ width: 74, height: 74, borderRadius: 10 }} contentFit="cover" />
+              <Pressable onPress={() => setDraft({ ...draft, photos: draft.photos.filter((_, j) => j !== i) })} accessibilityLabel="Remove photo"
+                style={{ position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.line }}>
+                <Icon name="close" size={13} color={C.ink} />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Btn title="Choose photos" kind="outline" onPress={pick} style={{ flex: 1 }} />
+          <Btn title="Camera" kind="outline" onPress={camera} style={{ flex: 0.6 }} />
+        </View>
+      </> : null}
+      {!hideVoice ? <View style={[st.card, { alignItems: 'center', marginTop: 8 }]}>
         {prompt ? <Text style={{ fontFamily: F.serifItalic, fontSize: 16, color: C.ink, textAlign: 'center', marginBottom: 8 }}>“{prompt}”</Text> : null}
         <Pressable onPress={toggleRec} disabled={listening} accessibilityLabel={rec.isRecording ? 'Stop recording' : 'Record your voice'}
           style={{ width: 86, height: 86, borderRadius: 43, backgroundColor: rec.isRecording ? C.red : '#C0533E', alignItems: 'center', justifyContent: 'center' }}>
@@ -180,11 +182,11 @@ export function Composer({ draft, setDraft, prompt }: { draft: Draft; setDraft: 
           </View>
         ) : null}
         {listening ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><ActivityIndicator color={C.green} /><Small>Turning your words into text…</Small></View> : null}
-      </View>
-      {draft.audioUri && !listening ? (
+      </View> : null}
+      {!hideVoice && draft.audioUri && !listening ? (
         <Field label="Your words, from the recording (you can edit them)" multiline value={draft.transcript} onChangeText={t => setDraft({ ...draft, transcript: t })} />
       ) : null}
-      <Field placeholder="Or write a few words…" multiline value={draft.text} onChangeText={t => setDraft({ ...draft, text: t })} />
+      {!hideText ? <Field placeholder="Or write a few words…" multiline value={draft.text} onChangeText={t => setDraft({ ...draft, text: t })} /> : null}
     </View>
   );
 }

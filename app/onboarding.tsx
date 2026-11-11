@@ -3,6 +3,7 @@ import { ActivityIndicator, BackHandler, KeyboardAvoidingView, Platform, Pressab
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ML from 'expo-media-library/legacy';
 import type { PurchasesPackage } from 'react-native-purchases';
 import { Alert } from '@/lib/alert';
@@ -56,15 +57,14 @@ function GroupCard({ group, onEdit }: { group: MomentGroup; onEdit: () => void }
   const sorted = group.assets.slice().sort((a, b) => a.creationTime - b.creationTime);
   return <Pressable accessibilityRole="button" accessibilityLabel={'Edit moment ' + group.title} onPress={onEdit}
     style={({ pressed }) => [styles.groupCard, pressed && { opacity: 0.8 }]}>
-    <View style={{ flex: 1, paddingRight: 10, gap: 3 }}>
+    <View style={{ flex: 1 }}>
       <Text style={styles.groupTitle} numberOfLines={2}>{group.title}</Text>
-      <Text style={styles.smallText}>{group.assets.length} photos</Text>
-      {sorted.length ? <Text style={styles.groupDate}>{dateLabel(sorted[0].creationTime)}{sorted.length > 1 ? ' – ' + dateLabel(sorted[sorted.length - 1].creationTime) : ''}</Text> : null}
+      {sorted.length ? <Text style={styles.groupDate}>{dateLabel(sorted[0].creationTime)}{sorted.length > 1 ? ' – ' + dateLabel(sorted[sorted.length - 1].creationTime) : ''} · {group.assets.length} photos</Text> : <Text style={styles.smallText}>{group.assets.length} photos</Text>}
+      <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+        {group.assets.slice(0, 3).map(a =>
+          <Image key={a.id} source={{ uri: a.uri }} style={styles.groupThumb} contentFit="cover" />)}
+      </View>
       <Text style={styles.editHint}>Tap to rename or edit photos</Text>
-    </View>
-    <View style={{ flexDirection: 'row', gap: 4 }}>
-      {group.assets.slice(0, 2).map(a =>
-        <Image key={a.id} source={{ uri: a.uri }} style={styles.groupThumb} contentFit="cover" />)}
     </View>
     <Text style={{ fontSize: 20, color: C.green, marginLeft: 4 }}>›</Text>
   </Pressable>;
@@ -80,6 +80,7 @@ export default function Onboarding() {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>(['Family']);
   const [morning, setMorning] = useState(true);
+  const [recognisePeople, setRecognisePeople] = useState(false);
   const [totalPhotos, setTotalPhotos] = useState<number | null>(null);
   const [photoAccess, setPhotoAccess] = useState(false);
   const [groups, setGroups] = useState<MomentGroup[]>([]);
@@ -413,15 +414,19 @@ export default function Onboarding() {
           <IntroPhotoCards />
           <View style={styles.benefit}><View style={styles.benefitIcon}><Icon name="lock" size={22} color={C.green} /></View><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>Private by default</Text><Text style={styles.smallText}>Nothing is uploaded until you choose to create a story.</Text></View></View>
           <View style={styles.benefit}><View style={styles.benefitIcon}><Icon name="check" size={22} color={C.green} /></View><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>You&apos;re in control</Text><Text style={styles.smallText}>Rename groups, add or remove photos, or skip this step.</Text></View></View>
-          <View style={styles.benefit}><View style={styles.benefitIcon}><Icon name="shield" size={22} color={C.green} /></View><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>No AI or location tracking</Text><Text style={styles.smallText}>Photos are grouped on your phone using their dates and times.</Text></View></View>
+          <View style={styles.benefit}><View style={styles.benefitIcon}><Icon name="shield" size={22} color={C.green} /></View><View style={{ flex: 1 }}><Text style={styles.benefitTitle}>No location tracking</Text><Text style={styles.smallText}>We never track where you go. Groups are built on your phone from dates and places.</Text></View></View>
         </> : null}
 
         {step === 2 ? <>
           <Text style={styles.heading}>We found {totalPhotos === null ? 'your' : totalPhotos.toLocaleString('en-GB')} photos</Text>
-          <Text style={styles.paragraph}>Review suggested moments, rename them and choose which photos belong together. Only photos you allow are visible here.</Text>
+          <Text style={styles.paragraph}>Grouped into {groups.length || 'suggested'} moments by place and date. Nothing is shared.</Text>
           {groups.length ? groups.map(group => <GroupCard key={group.id} group={group} onEdit={() => openEditor(group)} />) :
             <View style={styles.empty}><Text style={styles.benefitTitle}>No suggested moments yet</Text><Text style={styles.smallText}>Create your own group by selecting photos below.</Text></View>}
           <Btn title="+ Create your own group" kind="outline" onPress={() => openEditor()} />
+          <View style={{ marginTop: 12 }}>
+            <ToggleRow title="Recognise people" sub="Optional. Faces stay on your phone, and you confirm each name." value={recognisePeople}
+              onChange={v => { setRecognisePeople(v); if (userId) void AsyncStorage.setItem('ws_recognise_people_' + userId, v ? '1' : '0').catch(() => {}); }} />
+          </View>
           <Text style={[styles.note, { marginTop: 8 }]}>Names are yours to edit. We never guess a city or event from a picture.</Text>
         </> : null}
 
@@ -510,7 +515,7 @@ const styles = StyleSheet.create({
   groupCard: { flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 10, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, borderRadius: 17 },
   groupTitle: { fontFamily: F.serif, color: C.navy, fontSize: 19 },
   groupDate: { fontFamily: F.sans, color: C.grey, fontSize: 10.5 },
-  groupThumb: { width: 56, height: 67, borderRadius: 9, backgroundColor: '#E4DAD0' },
+  groupThumb: { width: 82, height: 62, borderRadius: 9, backgroundColor: '#E4DAD0' },
   editHint: { color: C.green, fontFamily: F.sansMedium, fontSize: 11, marginTop: 2 },
   empty: { backgroundColor: C.card, padding: 22, borderRadius: 16, marginVertical: 12 },
   galleryHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 18 },
