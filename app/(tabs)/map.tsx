@@ -4,13 +4,13 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import * as Location from 'expo-location';
 import { Alert } from '@/lib/alert';
 import { listStoriesWithPreferences, type StoryWithPreference } from '@/lib/story-preferences';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Chip, Empty, Loading, LoadError, Small } from '@/components/ui';
 import { Photo } from '@/components/media';
 import { BrandHeader } from '@/components/story-chrome';
 import { Icon, type IconName } from '@/components/icon';
-import { STORY_MAP_AVAILABLE, StoryMapView, type StoryMapHandle } from '@/components/story-map-view';
+import { STORY_MAP_AVAILABLE, StoryMapView, type EventMapPin, type StoryMapHandle } from '@/components/story-map-view';
 import { getStory, type Entry } from '@/lib/api';
 import { placeNames } from '@/lib/places';
 import { clusterStories, plural, type MapCluster, type MapZoom } from '@/lib/story-display';
@@ -27,6 +27,7 @@ const storyPath = (id: string) => `/story/${id}` as const;
 const viewParams = (view: 'list' | 'calendar') => ({ pathname: '/(tabs)/stories' as const, params: { view, at: String(Date.now()) } });
 
 export default function StoriesMap() {
+  const { place: eventPlace, eventTitle, at } = useLocalSearchParams<{ place?: string; eventTitle?: string; at?: string }>();
   const { data: stories, error, reload } = useFocusResource(listStoriesWithPreferences);
   // undefined: nothing touched yet, so the latest story is shown. null: closed by the person.
   const [selected, setSelected] = useState<string[] | null | undefined>(undefined);
@@ -34,17 +35,67 @@ export default function StoriesMap() {
   const [zoom, setZoom] = useState<MapZoom | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
   const [locationBusy, setLocationBusy] = useState(false);
+  const [eventPin, setEventPin] = useState<EventMapPin | null>(null);
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const map = useRef<StoryMapHandle>(null);
+
+  useEffect(() => {
+    let active = true;
+    Location.getForegroundPermissionsAsync()
+      .then(async p => {
+        if (!p.granted || !active) return;
+        const pos = await Location.getLastKnownPositionAsync().catch(() => null)
+          ?? await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null);
+        if (!active || !pos) return;
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserCoords(coords);
+        if (!eventPlace) {
+          setSelected(null);
+          map.current?.locate(coords.lat, coords.lng);
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [eventPlace]);
+
+  useEffect(() => {
+    let active = true;
+    const placeQuery = eventPlace?.trim();
+    if (!placeQuery) {
+      Promise.resolve().then(() => { if (active) setEventPin(null); });
+      return () => { active = false; };
+    }
+    Location.geocodeAsync(placeQuery)
+      .then(results => {
+        if (!active || !results[0]) return;
+        const pin: EventMapPin = {
+          lat: results[0].latitude,
+          lng: results[0].longitude,
+          label: eventTitle ? `${eventTitle} · ${placeQuery}` : placeQuery,
+        };
+        setEventPin(pin);
+        setSelected(null);
+        map.current?.focusRegion(pin.lat, pin.lng, 0.14, 0.14);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [eventPlace, eventTitle, at]);
 
   const placed = useMemo(() => (stories ?? []).filter(s => s.lat != null && s.lng != null), [stories]);
   const region = useMemo(() => {
+    if (eventPin) {
+      return { latitude: eventPin.lat, longitude: eventPin.lng, latitudeDelta: 0.14, longitudeDelta: 0.14 };
+    }
+    if (userCoords && !eventPlace) {
+      return { latitude: userCoords.lat, longitude: userCoords.lng, latitudeDelta: 0.12, longitudeDelta: 0.12 };
+    }
     if (!placed.length) return null;
     const lats = placed.map(s => s.lat!), lngs = placed.map(s => s.lng!);
     return {
       latitude: (Math.min(...lats) + Math.max(...lats)) / 2, longitude: (Math.min(...lngs) + Math.max(...lngs)) / 2,
       latitudeDelta: Math.max(0.08, (Math.max(...lats) - Math.min(...lats)) * 1.8), longitudeDelta: Math.max(0.08, (Math.max(...lngs) - Math.min(...lngs)) * 1.8),
     };
-  }, [placed]);
+  }, [placed, eventPin, userCoords, eventPlace]);
   const selectedIds = useMemo(() => selected === undefined ? placed.slice(0, 1).map(s => s.id) : selected ?? [], [selected, placed]);
   const selectedStories = useMemo(() => placed.filter(s => selectedIds.includes(s.id)), [placed, selectedIds]);
   const single = selectedStories.length === 1 ? selectedStories[0] : null;
@@ -108,6 +159,16 @@ export default function StoriesMap() {
       <Chip label="Map" icon="pin" on soft />
       <Chip label="People" icon="people" onPress={() => router.push('/people')} />
       <Chip label="Calendar" icon="calendar" onPress={() => router.navigate(viewParams('calendar'))} />
+      {placed.length > 0 && region ? (
+        <Chip label={`Show all (${placed.length})`} icon="image" onPress={() => {
+          setEventPin(null);
+          setSelected(placed.map(s => s.id));
+          const lats = placed.map(s => s.lat!), lngs = placed.map(s => s.lng!);
+          const lat = (Math.min(...lats) + Math.max(...lats)) / 2;
+          const lng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+          map.current?.focusRegion(lat, lng, Math.max(0.15, (Math.max(...lats) - Math.min(...lats)) * 1.8), Math.max(0.15, (Math.max(...lngs) - Math.min(...lngs)) * 1.8));
+        }} />
+      ) : null}
     </ScrollView>
   </SafeAreaView>;
 
@@ -131,17 +192,21 @@ export default function StoriesMap() {
     tiles = selectedStories.map(storyTile);
     title = names[selectedStories[0].id] ?? `${selectedStories.length} stories here`;
     sub = `${selectedStories.length} stories · ${plural(selectedStories.reduce((n, s) => n + (s.photoCount ?? 0), 0), 'photo')}`;
+  } else if (eventPin) {
+    tiles = placed.map(storyTile);
+    title = eventPin.label;
+    sub = placed.length ? 'Event location · Tap a photo to see that story.' : 'Event location pinned on the map.';
   } else {
     tiles = placed.map(storyTile);
-    title = `${plural(placed.length, 'story', 'stories')} on the map`;
-    sub = 'Tap a photo to see that story.';
+    title = placed.length ? `${plural(placed.length, 'story', 'stories')} on the map` : 'Near you';
+    sub = placed.length ? 'Tap a photo to see that story.' : 'Stories with photo locations appear here.';
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: C.cream }}>
       {header}
       <View style={{ flex: 1 }}>
-        <StoryMapView ref={map} region={region} clusters={clusters} selectedIds={selectedIds} onZoomChange={changeZoom} onPick={pick} onBackgroundPress={() => setSelected(null)} />
+        <StoryMapView ref={map} region={region} clusters={clusters} selectedIds={selectedIds} eventPin={eventPin} onZoomChange={changeZoom} onPick={pick} onBackgroundPress={() => setSelected(null)} />
         {STORY_MAP_AVAILABLE ? <>
           <View style={styles.controls}>
             <ControlButton icon="locate" label={locationBusy ? 'Finding your location' : 'Go to my location'} onPress={goToCurrentLocation} />

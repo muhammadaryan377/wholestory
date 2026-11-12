@@ -28,6 +28,7 @@ const ICONS = {
   locate: ['location', 'near_me'],
   tag: ['tag', 'sell'],
   close: ['xmark', 'close'],
+  backspace: ['delete.left', 'backspace'],
   person: ['person', 'person'],
   camera: ['camera', 'photo_camera'],
   pencil: ['pencil', 'edit'],

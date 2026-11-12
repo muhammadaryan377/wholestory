@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LoadError, Screen, Small, Empty, Loading, Chip } from '@/components/ui';
-import { Photo } from '@/components/media';
+import { Photo, StoryCoverPlaceholder } from '@/components/media';
 import { BrandHeader, CATEGORY_TAGS, Scrim, SearchBar, Tag } from '@/components/story-chrome';
 import { StoryActionsSheet } from '@/components/story-actions';
 import { Icon, type IconName } from '@/components/icon';
@@ -75,7 +75,7 @@ export default function Stories() {
     const visible = middle.slice(0, Math.max(0, room - (story.category ? 1 : 0)));
     return <View key={story.id} style={styles.storyRow}>
       <Pressable accessibilityRole="button" accessibilityLabel={'Open story ' + story.title} onPress={() => router.push(`/story/${story.id}`)} style={styles.storyContent}>
-        {story.cover ? <Photo path={story.cover} size={78} style={styles.thumbnail} /> : <View style={[styles.thumbnail, { backgroundColor: C.greenSoft }]} />}
+        {story.cover ? <Photo path={story.cover} size={78} style={styles.thumbnail} /> : <StoryCoverPlaceholder width={78} height={78} borderRadius={12} />}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.storyTitle} numberOfLines={1}>{story.title}</Text>
           <Text style={styles.storyMeta} numberOfLines={1}>{storyMeta(story)}</Text>
@@ -127,6 +127,8 @@ export default function Stories() {
       <Chip label="Favourites" icon="star" onPress={() => router.navigate('/favourites')} />
       <Chip label="Photos" icon="image" on={kind === 'photos'} onPress={() => setKind('photos')} />
       <Chip label="Voice notes" icon="mic" on={kind === 'voice'} onPress={() => setKind('voice')} />
+      <Chip label="Private stories" icon="lock" onPress={() => router.push('/private')} />
+      <Chip label="Suggested moments" icon="image" onPress={() => router.push('/suggestions')} />
     </ScrollView>
 
     {!stories.length ? <Empty title="No stories yet" body="A story can be one photo or a whole trip." action="Start a story" onAction={() => router.push('/story/new')} /> : null}
@@ -140,10 +142,6 @@ export default function Stories() {
         {list.map(storyRow)}
       </View>) :
       shown.map(storyRow)}
-    <View style={styles.footerLinks}>
-      <Chip label="Private stories" icon="lock" onPress={() => router.push('/private')} />
-      <Chip label="Suggested moments" icon="image" onPress={() => router.push('/suggestions')} />
-    </View>
     {menuStory && session?.user.id ? <StoryActionsSheet story={menuStory} userId={session.user.id} onClose={() => setMenuId(null)} onChanged={reload} /> : null}
   </Screen>;
 }
@@ -169,5 +167,4 @@ const styles = StyleSheet.create({
   more: { paddingLeft: 8, paddingVertical: 8 },
   month: { fontFamily: F.serif, fontSize: 19, marginBottom: 8, color: C.navy },
   empty: { borderRadius: 14, padding: 18, backgroundColor: C.card },
-  footerLinks: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12 },
 });

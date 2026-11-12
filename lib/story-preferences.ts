@@ -5,12 +5,13 @@ import { listFavourites, listStories, type Story } from './api';
 export const STORY_CATEGORIES = ['Travel', 'Events', 'Family', 'Everyday life', 'Friends'] as const;
 export type StoryCategory = typeof STORY_CATEGORIES[number];
 export type StoryLocation = { lat: number; lng: number; source: 'current' | 'manual' };
-export type StoryPreference = { category?: StoryCategory; location?: StoryLocation; tags?: string[]; favourite?: boolean };
-export type StoryWithPreference = Story & { category?: StoryCategory; explicitLocation?: StoryLocation; tags?: string[]; favourite?: boolean };
+export type StoryPreference = { category?: StoryCategory; location?: StoryLocation; tags?: string[]; favourite?: boolean; coverPath?: string };
+export type StoryWithPreference = Story & { category?: StoryCategory; explicitLocation?: StoryLocation; tags?: string[]; favourite?: boolean; coverPath?: string };
 
 const storageKey = (userId: string) => 'ws_story_preferences_v1_' + userId;
 const growthKey = (userId: string) => 'ws_story_growth_seen_v1_' + userId;
 const MAX_TAGS = 5, MAX_TAG_LENGTH = 24;
+const validCoverPath = (p: unknown): p is string => typeof p === 'string' && p.length > 0 && p.length <= 300;
 const cleanTags = (tags: unknown) => Array.isArray(tags)
   ? [...new Set(tags.filter((t): t is string => typeof t === 'string').map(t => t.trim().slice(0, MAX_TAG_LENGTH)).filter(Boolean))].slice(0, MAX_TAGS)
   : [];
@@ -35,6 +36,7 @@ export async function getStoryPreferences(userId: string): Promise<Record<string
         ...(validLocation(record.location) ? { location: record.location } : {}),
         ...(cleanTags(record.tags).length ? { tags: cleanTags(record.tags) } : {}),
         ...(typeof record.favourite === 'boolean' ? { favourite: record.favourite } : {}),
+        ...(validCoverPath(record.coverPath) ? { coverPath: record.coverPath } : {}),
       };
     }
     return safe;
@@ -56,6 +58,7 @@ export async function saveStoryPreference(userId: string, storyId: string, patch
   }
   if (patch.tags !== undefined) next.tags = cleanTags(patch.tags);
   if (patch.favourite !== undefined) next.favourite = patch.favourite;
+  if (patch.coverPath !== undefined && validCoverPath(patch.coverPath)) next.coverPath = patch.coverPath;
   all[storyId] = next;
   await AsyncStorage.setItem(storageKey(userId), JSON.stringify(all));
 }
@@ -101,6 +104,8 @@ export async function listStoriesWithPreferences(): Promise<StoryWithPreference[
     const favourite = pref?.favourite ?? hearted.has(story.id);
     return pref ? {
       ...story,
+      cover: pref.coverPath ?? story.cover,
+      coverPath: pref.coverPath,
       category: pref.category,
       tags: pref.tags,
       favourite,

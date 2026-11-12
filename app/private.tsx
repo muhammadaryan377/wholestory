@@ -45,8 +45,16 @@ function Keypad({ onDigit, onBack, onClear }: { onDigit: (d: string) => void; on
                 alignItems: 'center', justifyContent: 'center',
                 opacity: pressed ? 0.8 : 1,
               })}>
-              <Text style={{ color: '#101010', fontFamily: F.sans, fontSize: size * 0.44, lineHeight: size * 0.52 }}>{n}</Text>
-              {letters ? <Text style={{ color: '#262626', fontFamily: F.sansBold, fontSize: Math.max(9, size * 0.14), letterSpacing: 1.5, marginTop: -2 }}>{letters}</Text> : null}
+              {n === '*' ? (
+                <Text style={{ color: '#101010', fontFamily: F.sansMedium, fontSize: Math.max(12, size * 0.2) }}>Clear</Text>
+              ) : n === '#' ? (
+                <Icon name="backspace" size={Math.round(size * 0.36)} color="#101010" />
+              ) : (
+                <>
+                  <Text style={{ color: '#101010', fontFamily: F.sans, fontSize: size * 0.44, lineHeight: size * 0.52 }}>{n}</Text>
+                  {letters ? <Text style={{ color: '#262626', fontFamily: F.sansBold, fontSize: Math.max(9, size * 0.14), letterSpacing: 1.5, marginTop: -2 }}>{letters}</Text> : null}
+                </>
+              )}
             </Pressable>
           ))}
         </View>

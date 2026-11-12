@@ -83,11 +83,12 @@ async function saveWebProfilePhoto(userId: string, asset: ImagePicker.ImagePicke
 }
 
 /** Keeps the chosen photo on this device, then saves it to the account. A failed upload is retried later. */
-export async function chooseLocalProfilePhoto(userId: string): Promise<string | null> {
+export async function chooseLocalProfilePhoto(userId: string, onUploading?: () => void): Promise<string | null> {
   const choice = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,
   });
   if (choice.canceled || !choice.assets[0]?.uri) return null;
+  onUploading?.();
   const local = Platform.OS === 'web' ? await saveWebProfilePhoto(userId, choice.assets[0]) : await saveNativeProfilePhoto(userId, choice.assets[0].uri);
   await AsyncStorage.setItem(pendingKey(userId), '1');
   await syncPendingProfilePhoto(userId);

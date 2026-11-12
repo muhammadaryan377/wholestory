@@ -10,6 +10,7 @@ import { viewUrl, eventUrl } from '@/lib/media';
 import { transcribeFile } from '@/lib/speech';
 import { Btn, Field, Small, st, runAction } from './ui';
 import { Icon } from './icon';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import type { Draft, Picked } from '@/lib/api';
 import { photoMetadata } from '@/lib/photo-metadata';
 
@@ -18,6 +19,21 @@ export const fmt = (ms: number) => { const s = Math.round(ms / 1000); return `${
 /** Reads the place and time saved in a photo, if there is one. */
 export function fromAsset(a: ImagePicker.ImagePickerAsset): Picked {
   return { uri: a.uri, ...photoMetadata(a.exif ?? {}) };
+}
+
+/** Clean coloured photo icon shown centered on story cards that do not have a cover photo yet. */
+export function StoryCoverPlaceholder({ width, height, borderRadius = 13 }: { width: number; height: number; borderRadius?: number }) {
+  const iconSize = Math.min(44, Math.max(32, Math.round(Math.min(width, height) * 0.42)));
+  return (
+    <View style={{ width, height, borderRadius, backgroundColor: '#EFE9DD', borderWidth: 1, borderColor: '#E2DAC9', alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={iconSize} height={iconSize} viewBox="0 0 36 36" fill="none">
+        <Rect x="3" y="5" width="30" height="26" rx="6" fill="#DCECF5" stroke="#2D6A4F" strokeWidth="1.8" />
+        <Circle cx="11.5" cy="13.5" r="2.8" fill="#F4B444" />
+        <Path d="M4.5 26.5C8.5 21 12.5 20.5 16.5 24C20.5 27.5 23.5 18 31.5 22.5V27.5C31.5 29.2 30.2 30.5 28.5 30.5H7.5C5.8 30.5 4.5 29.2 4.5 27.5V26.5Z" fill="#5CA37C" />
+        <Path d="M4.5 27.5C10 24.5 15 27 20 25C24.5 23.2 28 24.8 31.5 26.5V27.5C31.5 29.2 30.2 30.5 28.5 30.5H7.5C5.8 30.5 4.5 29.2 4.5 27.5Z" fill="#236D4B" />
+      </Svg>
+    </View>
+  );
 }
 
 /** A photo stored in Whole Story (private story file or event file). */

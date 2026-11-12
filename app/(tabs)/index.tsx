@@ -1,14 +1,17 @@
 import { parseDate } from '@/lib/dates';
 import { useCallback, useState } from 'react';
-import { View, Text, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { H2, P, Small, Empty, Btn, runAction } from '@/components/ui';
-import { Photo } from '@/components/media';
+import { Photo, StoryCoverPlaceholder } from '@/components/media';
 import { BrandHeader, Scrim } from '@/components/story-chrome';
 import { Icon } from '@/components/icon';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { getGrowthSeen, listStoriesWithPreferences, markGrowthSeen, type StoryWithPreference } from '@/lib/story-preferences';
 import { memoryFilter, myName, type Story } from '@/lib/api';
+import { readLocalProfilePhoto, chooseLocalProfilePhoto } from '@/lib/profile-photo';
+import { Alert } from '@/lib/alert';
 import { findSuggestions, libraryAllowed, toPicked, type Suggestion } from '@/lib/suggest';
 import { getPrefs, scheduleLocal } from '@/lib/notify';
 import { handOff } from '@/lib/handoff';
@@ -38,7 +41,11 @@ function SectionHeading({ title, onPress }: { title: string; onPress: () => void
 function MemoryCard({ story, width, detail }: { story: StoryWithPreference; width: number; detail: string }) {
   const height = Math.round(width * 0.78);
   return <Pressable accessibilityRole="button" accessibilityLabel={'Open ' + story.title} onPress={() => router.push(`/story/${story.id}`)} style={{ width }}>
-    {story.cover ? <Photo path={story.cover} size={width} style={{ width, height, borderRadius: 13 }} /> : <View style={[styles.placeholder, { width, height }]} />}
+    {story.cover ? (
+      <Photo path={story.cover} size={width} style={{ width, height, borderRadius: 13 }} />
+    ) : (
+      <StoryCoverPlaceholder width={width} height={height} />
+    )}
     <Text style={styles.cardTitle} numberOfLines={1}>{story.title}</Text>
     <View style={styles.cardDetail}><Icon name="image" size={13} color={C.grey} /><Text style={styles.cardDetailText} numberOfLines={2}>{detail}</Text></View>
   </Pressable>;
@@ -49,6 +56,9 @@ export default function Today() {
   const userId = session?.user.id;
   const { width } = useWindowDimensions();
   const [name, setName] = useState('');
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [avatarKey, setAvatarKey] = useState(0);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [stories, setStories] = useState<StoryWithPreference[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -60,10 +70,13 @@ export default function Today() {
   const load = useCallback(async () => {
     setBusy(true); setError('');
     try {
-      const [savedName, allStories, filter, pref, seenAt] = await Promise.all([
-        myName(), listStoriesWithPreferences(), memoryFilter(), getPrefs(), userId ? getGrowthSeen(userId) : Promise.resolve({}),
+      const [savedName, allStories, filter, pref, seenAt, savedAvatar] = await Promise.all([
+        myName(), listStoriesWithPreferences(), memoryFilter(), getPrefs(),
+        userId ? getGrowthSeen(userId) : Promise.resolve({}),
+        userId ? readLocalProfilePhoto(userId).catch(() => null) : Promise.resolve(null),
       ]);
       setName(savedName);
+      setAvatarUri(savedAvatar);
       setStories(allStories); setKeep(() => filter); setSeen(seenAt);
       const canRead = await libraryAllowed();
       setAllowed(canRead);
@@ -82,8 +95,24 @@ export default function Today() {
     router.push('/story/new');
   };
 
+  const pickAvatar = async () => {
+    if (!userId || uploadingAvatar) return;
+    try {
+      const uri = await chooseLocalProfilePhoto(userId, () => setUploadingAvatar(true));
+      if (uri) {
+        setAvatarUri(uri);
+        setAvatarKey(k => k + 1);
+      }
+    } catch (reason) {
+      Alert.alert('Could not update photo', reason instanceof Error ? reason.message : 'Please try again.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const visible = (stories ?? []).filter(s => keep ? keep(s) : !s.hidden_from_memories);
-  const featured = visible.find(s => !!s.cover);
+  const totalMemories = visible.reduce((sum, s) => sum + (s.entryCount ?? 0), 0);
+  const firstName = name.trim().split(' ')[0] || '';
   const memories = visible.filter(s => anniversary(s.story_date)).slice(0, 8);
   const recent = visible.slice(0, 8);
   const growth = userId ? findStoryGrowth(visible, userId, seen) : null;
@@ -100,22 +129,47 @@ export default function Today() {
     <SafeAreaView style={{ flex: 1, backgroundColor: C.cream }} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: S.pad, paddingTop: 8, paddingBottom: 28 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
         <BrandHeader />
-        <Text style={styles.greeting} accessibilityRole="header">{greeting()}{name ? ', ' + name.split(' ')[0] : ''}</Text>
+        <Text style={styles.greeting} accessibilityRole="header">{greeting()}{firstName ? ', ' + firstName : ''}</Text>
         <Text style={styles.tagline}>A few ideas. More memories to discover.</Text>
         {error ? <View style={styles.softCard}><P accessibilityRole="alert">{error}</P><Btn title="Try again" onPress={load} /></View> : null}
 
-        {featured?.cover ? <Pressable accessibilityRole="button" accessibilityLabel={'Open ' + featured.title} onPress={() => router.push(`/story/${featured.id}`)} style={styles.hero}>
-          <Photo path={featured.cover} size={320} style={styles.heroPhoto} />
-          <Scrim />
-          <View style={styles.heroText}>
-            <Text style={styles.heroTitle} numberOfLines={2}>{featured.title}</Text>
-            <View style={styles.heroSub}><Icon name="image" size={15} color="#FFF" /><Text style={styles.heroSubText}>{memoriesOf(featured)} · Still growing</Text></View>
-          </View>
+        <Pressable accessibilityRole="button" accessibilityLabel={avatarUri ? 'Update your profile photo' : 'Add your profile photo'} onPress={() => runAction(pickAvatar)} style={[styles.hero, !avatarUri && styles.heroEmpty]}>
+          {avatarUri ? (
+            <>
+              <Image key={avatarKey} source={{ uri: avatarUri }} style={styles.heroPhoto} contentFit="cover" cachePolicy="none" />
+              <Scrim />
+              <View style={styles.heroText}>
+                <Text style={styles.heroTitle} numberOfLines={2}>{name.trim() || 'Your Whole Story'}</Text>
+                <View style={styles.heroSub}>
+                  <Icon name="camera" size={14} color="#FFF" />
+                  <Text style={styles.heroSubText}>
+                    {visible.length
+                      ? `${plural(visible.length, 'story', 'stories')} · ${plural(totalMemories, 'memory', 'memories')}`
+                      : 'Tap to change your profile photo'}
+                  </Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.noPhotoGraphic}>
+                <Svg width={66} height={66} viewBox="0 0 66 66" fill="none">
+                  <Circle cx={33} cy={33} r={32} fill="#DCE8DF" stroke="#BDD1C3" strokeWidth={1.5} />
+                  <Circle cx={33} cy={26} r={9.5} stroke={C.green} strokeWidth={2.2} />
+                  <Path d="M18 48.5C20.6 41.8 26.2 38.5 33 38.5C39.8 38.5 45.4 41.8 48 48.5" stroke={C.green} strokeWidth={2.2} strokeLinecap="round" />
+                </Svg>
+              </View>
+              <View style={styles.heroText}>
+                <Text style={[styles.heroTitle, { color: C.navy }]} numberOfLines={1}>Add your profile picture</Text>
+                <View style={styles.heroSub}>
+                  <Icon name="camera" size={14} color={C.green} />
+                  <Text style={[styles.heroSubText, { color: C.ink }]}>Tap to upload a profile photo</Text>
+                </View>
+              </View>
+            </>
+          )}
           <View style={styles.heroArrow}><Icon name="forward" size={20} color={C.navy} /></View>
-        </Pressable> : <Pressable onPress={() => router.push('/story/new')} style={styles.softCard}>
-          <Text style={styles.subheading}>Your first story starts here</Text>
-          <Small>Choose a photo, and add the story behind it.</Small>
-        </Pressable>}
+        </Pressable>
 
         <SectionHeading title="This day last year" onPress={seeStories} />
         {memories.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontal} contentContainerStyle={styles.row}>
@@ -162,6 +216,16 @@ export default function Today() {
           <Small>Choose photo access to get private, on-device suggestions.</Small>
         </Pressable> : null}
       </ScrollView>
+
+      <Modal visible={uploadingAvatar} transparent animationType="fade">
+        <View style={styles.uploadBackdrop}>
+          <View style={styles.uploadDialog}>
+            <ActivityIndicator size="large" color={C.green} />
+            <Text style={styles.uploadTitle}>Uploading profile picture…</Text>
+            <Small style={{ textAlign: 'center', marginTop: 4 }}>Saving your photo to Whole Story.</Small>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -170,6 +234,8 @@ const styles = StyleSheet.create({
   greeting: { fontFamily: F.serif, fontSize: 31, color: C.navy, letterSpacing: -0.4 },
   tagline: { fontFamily: F.sans, fontSize: 14, color: C.ink, marginBottom: 10 },
   hero: { borderRadius: 16, overflow: 'hidden', height: 170, backgroundColor: '#E9DED2' },
+  heroEmpty: { backgroundColor: '#EAF0EA', borderWidth: 1, borderColor: '#D6E2D8', justifyContent: 'center' },
+  noPhotoGraphic: { alignItems: 'center', marginBottom: 38 },
   heroPhoto: { width: '100%', height: 170, borderRadius: 0 },
   heroText: { position: 'absolute', left: 14, right: 56, bottom: 12 },
   heroTitle: { color: '#FFF', fontFamily: F.serif, fontSize: 21 },
@@ -182,7 +248,6 @@ const styles = StyleSheet.create({
   seeNew: { color: C.green, fontFamily: F.sansMedium, fontSize: 12 },
   horizontal: { marginHorizontal: -S.pad },
   row: { paddingHorizontal: S.pad, gap: CARD_GAP },
-  placeholder: { backgroundColor: '#E7E0D4', borderRadius: 13 },
   cardTitle: { color: C.navy, fontFamily: F.serif, fontSize: 15, marginTop: 5 },
   cardDetail: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   cardDetailText: { flex: 1, color: C.grey, fontFamily: F.sans, fontSize: 11 },
@@ -193,4 +258,7 @@ const styles = StyleSheet.create({
   micCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FBEFEB', alignItems: 'center', justifyContent: 'center' },
   voiceSub: { fontFamily: F.sans, fontSize: 13, color: C.ink },
   subheading: { color: C.navy, fontFamily: F.serif, fontSize: 18, marginBottom: 2 },
+  uploadBackdrop: { flex: 1, backgroundColor: 'rgba(18, 28, 22, 0.45)', alignItems: 'center', justifyContent: 'center', padding: 28 },
+  uploadDialog: { width: '100%', maxWidth: 290, backgroundColor: C.cream, borderRadius: 20, borderWidth: 1, borderColor: C.line, padding: 24, alignItems: 'center' },
+  uploadTitle: { fontFamily: F.serif, fontSize: 19, color: C.navy, marginTop: 14, textAlign: 'center' },
 });

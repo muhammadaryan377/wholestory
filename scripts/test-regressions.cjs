@@ -476,3 +476,68 @@ test('reference photography is bundled locally and used in each intended app sta
   assert.ok(!welcome.includes('images.unsplash.com'));
   assert.ok(!onboarding.includes('images.unsplash.com'));
 });
+
+test('moments split automatically by resolved city and date across a multi-stop trip', () => {
+  const { splitStoryMoments, groupPickedByPlaceAndDay } = load('lib/moment-splits.ts', {});
+  const entries = [{
+    id: 'e1',
+    story_id: 's1',
+    author: 'u1',
+    text: 'India highlights',
+    transcript: null,
+    audio_path: 'u1/voice.m4a',
+    duration_ms: 4000,
+    created_at: '2026-08-05T10:00:00Z',
+    photos: [
+      { id: 'p1', path: 'p/1.jpg', lat: 19.07, lng: 72.87, taken_at: '2026-08-02T10:00:00Z' },
+      { id: 'p2', path: 'p/2.jpg', lat: 19.08, lng: 72.88, taken_at: '2026-08-02T15:00:00Z' },
+      { id: 'p3', path: 'p/3.jpg', lat: 28.61, lng: 77.20, taken_at: '2026-08-04T11:00:00Z' },
+      { id: 'p4', path: 'p/4.jpg', taken_at: '2026-08-05T09:00:00Z' },
+    ],
+  }];
+  const moments = splitStoryMoments(entries, { p1: 'Mumbai', p2: 'Mumbai', p3: 'Delhi' }, 'India 2026');
+  assert.equal(moments.length, 3);
+  assert.equal(moments[0].title, 'Mumbai');
+  assert.equal(moments[0].photos.length, 2);
+  assert.equal(moments[1].title, 'Delhi');
+  assert.equal(moments[1].photos.length, 1);
+  assert.equal(moments[2].photos.length, 1);
+
+  const pickedGroups = groupPickedByPlaceAndDay(
+    [
+      { uri: 'file:///1.jpg', lat: 19.07, lng: 72.87, takenAt: '2026-08-02T10:00:00Z' },
+      { uri: 'file:///2.jpg', lat: 28.61, lng: 77.20, takenAt: '2026-08-04T11:00:00Z' },
+    ],
+    { 'picked:0': 'Mumbai', 'picked:1': 'Delhi' },
+  );
+  assert.equal(pickedGroups.length, 2);
+  assert.match(pickedGroups[0].label, /^Mumbai · /);
+  assert.match(pickedGroups[1].label, /^Delhi · /);
+});
+
+test('suggestions filter out screenshots and format place + date-range titles cleanly', () => {
+  const { clusterSuggestionAssets, formatSuggestionTitle, isMemoryPhotoAsset } = load('lib/suggest-groups.ts', {});
+  assert.equal(isMemoryPhotoAsset({ id: '1', filename: 'IMG_1001.JPG', width: 3024, height: 4032, creationTime: 1000 }), true);
+  assert.equal(isMemoryPhotoAsset({ id: '2', filename: 'IMG_1002.PNG', mediaSubtypes: ['screenshot'], width: 1179, height: 2556, creationTime: 1000 }), false);
+  assert.equal(isMemoryPhotoAsset({ id: '3', filename: 'Screenshot 2026-08-02.png', width: 1179, height: 2556, creationTime: 1000 }), false);
+  assert.equal(isMemoryPhotoAsset({ id: '4', filename: 'thumb.jpg', width: 120, height: 120, creationTime: 1000 }), false);
+
+  const augTrip1 = Array.from({ length: 6 }, (_, i) => ({
+    id: `t1-${i}`, filename: `IMG_1${i}.HEIC`, width: 3024, height: 4032,
+    creationTime: Date.UTC(2026, 7, 2 + Math.floor(i / 2), 10, 0),
+  }));
+  const augTrip2 = Array.from({ length: 5 }, (_, i) => ({
+    id: `t2-${i}`, filename: `IMG_2${i}.HEIC`, width: 3024, height: 4032,
+    creationTime: Date.UTC(2026, 7, 15 + i, 12, 0),
+  }));
+  const qrScreenshot = { id: 'qr', filename: 'boarding.png', mediaSubtypes: ['screenshot'], width: 1179, height: 2556, creationTime: Date.UTC(2026, 7, 2, 11, 0) };
+  const clusters = clusterSuggestionAssets([...augTrip1, qrScreenshot, ...augTrip2]);
+  assert.equal(clusters.length, 2);
+  assert.equal(clusters[0].length, 5);
+  assert.equal(clusters[1].length, 6);
+
+  const title1 = formatSuggestionTitle(['Mumbai', 'Delhi'], Date.UTC(2026, 7, 2), Date.UTC(2026, 7, 7));
+  assert.match(title1, /^Mumbai & Delhi · 2–7 Aug 2026$/);
+  const title2 = formatSuggestionTitle([], Date.UTC(2026, 7, 15), Date.UTC(2026, 7, 19));
+  assert.match(title2, /^15–19 Aug 2026$/);
+});

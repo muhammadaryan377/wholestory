@@ -7,8 +7,22 @@ import type { MapCluster, MapZoom } from '@/lib/story-display';
 import { Photo } from './media';
 import { Icon } from './icon';
 
-export type StoryMapHandle = { zoom: (factor: number) => void; focus: (lat: number, lng: number, factor?: number) => void; locate: (lat: number, lng: number) => void };
-export type StoryMapProps = { region: Region; clusters: MapCluster[]; selectedIds: string[]; onZoomChange: (zoom: MapZoom) => void; onPick: (cluster: MapCluster) => void; onBackgroundPress: () => void };
+export type StoryMapHandle = {
+  zoom: (factor: number) => void;
+  focus: (lat: number, lng: number, factor?: number) => void;
+  focusRegion: (lat: number, lng: number, latDelta?: number, lngDelta?: number) => void;
+  locate: (lat: number, lng: number) => void;
+};
+export type EventMapPin = { lat: number; lng: number; label: string };
+export type StoryMapProps = {
+  region: Region;
+  clusters: MapCluster[];
+  selectedIds: string[];
+  eventPin?: EventMapPin | null;
+  onZoomChange: (zoom: MapZoom) => void;
+  onPick: (cluster: MapCluster) => void;
+  onBackgroundPress: () => void;
+};
 
 export { STORY_MAP_AVAILABLE };
 
@@ -31,7 +45,7 @@ function StoryPin({ cluster, selected }: { cluster: MapCluster; selected: boolea
   );
 }
 
-export const StoryMapView = forwardRef<StoryMapHandle, StoryMapProps>(function StoryMapView({ region, clusters, selectedIds, onZoomChange, onPick, onBackgroundPress }, ref) {
+export const StoryMapView = forwardRef<StoryMapHandle, StoryMapProps>(function StoryMapView({ region, clusters, selectedIds, eventPin, onZoomChange, onPick, onBackgroundPress }, ref) {
   const map = useRef<MapView>(null);
   const current = useRef<Region>(region);
   const [showUser, setShowUser] = useState(false);
@@ -52,6 +66,9 @@ export const StoryMapView = forwardRef<StoryMapHandle, StoryMapProps>(function S
     focus: (latitude, longitude, factor = 1) => {
       const r = current.current;
       map.current?.animateToRegion({ latitude, longitude, latitudeDelta: r.latitudeDelta * factor, longitudeDelta: r.longitudeDelta * factor }, 350);
+    },
+    focusRegion: (latitude, longitude, latitudeDelta = 0.14, longitudeDelta = 0.14) => {
+      map.current?.animateToRegion({ latitude, longitude, latitudeDelta, longitudeDelta }, 380);
     },
     locate: (latitude, longitude) => {
       setShowUser(true);
@@ -76,6 +93,9 @@ export const StoryMapView = forwardRef<StoryMapHandle, StoryMapProps>(function S
           <StoryPin cluster={cluster} selected={cluster.stories.some(story => selectedIds.includes(story.id))} />
         </Marker>
       ))}
+      {eventPin ? (
+        <Marker coordinate={{ latitude: eventPin.lat, longitude: eventPin.lng }} title={eventPin.label} pinColor={C.green} />
+      ) : null}
     </MapView>
   );
 });

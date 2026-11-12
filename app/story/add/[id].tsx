@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -7,33 +7,34 @@ import { Alert } from '@/lib/alert';
 import { Screen, H1, P, Btn, Small } from '@/components/ui';
 import { Composer, fromAsset } from '@/components/media';
 import { Icon } from '@/components/icon';
-import { addToStory, emptyDraft, type Draft, type Picked } from '@/lib/api';
+import { addToStory, emptyDraft, type Draft } from '@/lib/api';
+import { placeNames } from '@/lib/places';
+import { groupPickedByPlaceAndDay } from '@/lib/moment-splits';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { C, F } from '@/lib/theme';
 
-type DayGroup = { key: string; label: string; photos: Picked[] };
-function groupByDay(photos: Picked[]): DayGroup[] {
-  const map = new Map<string, Picked[]>();
-  for (const p of photos) {
-    const label = p.takenAt
-      ? new Date(p.takenAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-      : 'Selected photos';
-    map.set(label, [...(map.get(label) ?? []), p]);
-  }
-  return [...map.entries()].map(([label, list]) => ({ key: label, label, photos: list }));
-}
-
 export default function AddToStory() {
-  const { id, title, shared, owner } = useLocalSearchParams<{ id: string; title?: string; shared?: string; owner?: string }>();
+  const { id, title, shared, owner, mode: initialMode } = useLocalSearchParams<{ id: string; title?: string; shared?: string; owner?: string; mode?: string }>();
   const [draft, setDraft] = useState<Draft>(emptyDraft());
-  const [mode, setMode] = useState<'none' | 'write' | 'voice'>('none');
+  const [mode, setMode] = useState<'none' | 'write' | 'voice'>(
+    initialMode === 'voice' || initialMode === 'write' ? initialMode : 'none',
+  );
+  const [pickedPlaces, setPickedPlaces] = useState<Record<string, string>>({});
   const [reviewMoments, setReviewMoments] = useState(false);
   const [skippedGroups, setSkippedGroups] = useState<string[]>([]);
   const [notifyOwner, setNotifyOwner] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const allowExit = useUnsavedGuard(!busy && (draft.photos.length > 0 || !!draft.text.trim() || !!draft.audioUri));
-  const groups = useMemo(() => groupByDay(draft.photos), [draft.photos]);
+  useEffect(() => {
+    let active = true;
+    const points = draft.photos.flatMap((p, index) => (
+      p.lat != null && p.lng != null ? [{ id: `picked:${index}`, lat: p.lat, lng: p.lng }] : []
+    ));
+    placeNames(points).then(names => { if (active) setPickedPlaces(names); }).catch(() => {});
+    return () => { active = false; };
+  }, [draft.photos]);
+  const groups = useMemo(() => groupPickedByPlaceAndDay(draft.photos, pickedPlaces), [draft.photos, pickedPlaces]);
 
   const pickPhotos = async () => {
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 30, quality: 0.85, exif: true });

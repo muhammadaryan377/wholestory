@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ML from 'expo-media-library/legacy';
 import { Platform } from 'react-native';
 import type { Picked } from './api';
+import { placeNames } from './places';
+import { clusterSuggestionAssets, formatSuggestionTitle, isMemoryPhotoAsset } from './suggest-groups';
 import { supabase } from './supabase';
 import { readNamedMoments } from './moment-groups';
 
@@ -16,21 +18,55 @@ export async function libraryAllowed(ask = false) {
 export async function dismissed(): Promise<string[]> { try { return JSON.parse((await AsyncStorage.getItem(DISMISSED)) ?? '[]'); } catch { return []; } }
 export async function dismiss(id: string) { const d = await dismissed(); await AsyncStorage.setItem(DISMISSED, JSON.stringify([...d, id])); }
 
-/** Groups the last two years of photos into moments worth telling: days or trips with many photos. Runs on the phone. */
+function sampleClusterAssets(assets: ML.Asset[], count = 4): ML.Asset[] {
+  if (assets.length <= count) return assets;
+  const indices = [...new Set(Array.from({ length: count }, (_, i) => Math.round((i * (assets.length - 1)) / (count - 1))))];
+  return indices.map(i => assets[i]);
+}
+
+async function resolveClusterPlaces(clusters: { id: string; assets: ML.Asset[] }[]): Promise<Record<string, string[]>> {
+  const points: { id: string; lat: number; lng: number }[] = [];
+  const sampleOwners = new Map<string, string>();
+  for (const cluster of clusters) {
+    const samples = sampleClusterAssets(cluster.assets, 4);
+    for (let i = 0; i < samples.length; i += 1) {
+      const sample = samples[i];
+      try {
+        const info = await ML.getAssetInfoAsync(sample);
+        if (info.location?.latitude != null && info.location?.longitude != null) {
+          const pointId = `${cluster.id}:${i}`;
+          points.push({ id: pointId, lat: info.location.latitude, lng: info.location.longitude });
+          sampleOwners.set(pointId, cluster.id);
+        }
+      } catch {
+        // Ignore unreadable EXIF on individual photos.
+      }
+    }
+  }
+  if (!points.length) return {};
+  const names = await placeNames(points).catch((): Record<string, string> => ({}));
+  const byCluster: Record<string, string[]> = {};
+  for (const [pointId, place] of Object.entries(names)) {
+    const cid = sampleOwners.get(pointId);
+    if (!cid) continue;
+    byCluster[cid] = [...(byCluster[cid] ?? []), place];
+  }
+  return byCluster;
+}
+
+/**
+ * Groups the last two years of real camera photos (excluding screenshots) into
+ * trips and outings, named with resolved places and exact date ranges. Runs on the phone.
+ */
 export async function findSuggestions(max = 12): Promise<Suggestion[]> {
   if (!(await libraryAllowed())) return [];
   const since = Date.now() - 730 * 864e5;
-  const page = await ML.getAssetsAsync({ mediaType: 'photo', sortBy: [[ 'creationTime', false ]], first: 3000, createdAfter: since });
-  const assets = page.assets.filter(a => a.creationTime);
-  const groups: ML.Asset[][] = [];
-  for (const a of assets) {
-    const g = groups[groups.length - 1];
-    if (g && g[g.length - 1].creationTime - a.creationTime < 30 * 3600 * 1000 && g[0].creationTime - a.creationTime < 14 * 864e5) g.push(a); else groups.push([a]);
-  }
+  const page = await ML.getAssetsAsync({ mediaType: 'photo', sortBy: [['creationTime', false]], first: 3000, createdAfter: since });
+  const assets = page.assets.filter(isMemoryPhotoAsset);
   const skip = await dismissed();
   const userId = (await supabase.auth.getSession()).data.session?.user.id;
   const saved = userId ? await readNamedMoments(userId) : [];
-  const byId = new Map(assets.map(a => [a.id, a]));
+  const byId = new Map(page.assets.filter(a => a.creationTime).map(a => [a.id, a]));
   const assigned = new Set(saved.flatMap(g => g.assetIds));
   const manual: Suggestion[] = saved.map(group => {
     const list = group.assetIds.map(id => byId.get(id)).filter((a): a is ML.Asset => !!a);
@@ -38,17 +74,29 @@ export async function findSuggestions(max = 12): Promise<Suggestion[]> {
     const times = list.map(a => a.creationTime).filter(Boolean);
     return { id: `named-${group.id}`, title: group.title, sub: `${list.length} photos · named by you`, start: Math.min(...times), end: Math.max(...times), assets: list };
   }).filter((g): g is Suggestion => g !== null);
-  const automatic = groups
-    .map(g => g.filter(a => !assigned.has(a.id)))
-    .filter(g => g.length >= 8)
+
+  const rawGroups = clusterSuggestionAssets(assets.filter(a => !assigned.has(a.id)))
     .map(g => {
       const end = g[0].creationTime, start = g[g.length - 1].creationTime;
-      const days = Math.max(1, Math.round((end - start) / 864e5) + 1);
-      const d = new Date(start);
-      const title = days >= 2 ? `${days} days in ${d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}` : d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-      return { id: `${start}-${g.length}`, title, sub: `${g.length} photos${days >= 2 ? ` · ${days} days` : ''}`, start, end, assets: g };
+      return { id: `${start}-${g.length}`, start, end, assets: g };
     })
-    .filter(s => !skip.includes(s.id));
+    .filter(s => !skip.includes(s.id))
+    .slice(0, max);
+
+  const placeMap = await resolveClusterPlaces(rawGroups);
+  const automatic: Suggestion[] = rawGroups.map(g => {
+    const days = Math.max(1, Math.round((g.end - g.start) / 864e5) + 1);
+    const title = formatSuggestionTitle(placeMap[g.id] ?? [], g.start, g.end);
+    return {
+      id: g.id,
+      title,
+      sub: `${g.assets.length} photos${days >= 2 ? ` · ${days} days` : ''}`,
+      start: g.start,
+      end: g.end,
+      assets: g.assets,
+    };
+  });
+
   return [...manual, ...automatic].filter(s => !skip.includes(s.id)).slice(0, max);
 }
 

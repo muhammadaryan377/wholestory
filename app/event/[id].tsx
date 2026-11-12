@@ -1,13 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import QRCode from 'react-native-qrcode-svg';
 import { Alert } from '@/lib/alert';
-import { Btn, Card, Chip, Empty, H1, H2, LoadError, Loading, P, Small, ToggleRow, runAction } from '@/components/ui';
+import { Btn, Card, Chip, Empty, H1, H2, LoadError, Loading, P, Small, Thread, ToggleRow, runAction } from '@/components/ui';
 import { Composer, Photo, VoicePlayer, fromAsset } from '@/components/media';
 import { Comments } from '@/components/comments';
 import { Icon } from '@/components/icon';
@@ -72,6 +72,15 @@ export default function EventScreen() {
   const allPhotos = useMemo(() => livePosts.flatMap(p => p.photos.map(ph => ({ ...ph, post: p }))), [livePosts]);
   const storyPosts = useMemo(() => livePosts.filter(p => !!p.text || !!p.audio_path), [livePosts]);
   const totalComments = useMemo(() => livePosts.reduce((n, p) => n + p.comments.length, 0), [livePosts]);
+  const contributors = useMemo(() => {
+    const names = new Set<string>();
+    for (const p of livePosts) {
+      if (p.guest_name?.trim()) names.add(p.guest_name.trim());
+      else if (p.author_user) names.add('Host');
+    }
+    if (!names.size) names.add('Host');
+    return [...names];
+  }, [livePosts]);
 
   if (loadError) return <LoadError error={loadError} onRetry={load} />;
   if (!data) return <Loading />;
@@ -162,48 +171,112 @@ export default function EventScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.cream }}>
-      <Stack.Screen options={{ title: '', headerRight: () => <Pressable onPress={() => setSettingsOpen(true)} hitSlop={12} accessibilityRole="button" accessibilityLabel="Event settings"><Icon name="more" size={24} color={C.ink} /></Pressable> }} />
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView edges={['top']} style={{ backgroundColor: C.cream }}>
+        <View style={styles.topBar}>
+          <Pressable
+            onPress={() => { if (router.canGoBack()) router.back(); else router.navigate('/(tabs)/events'); }}
+            style={styles.circleBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
+            <Icon name="back" size={22} color={C.navy} />
+          </Pressable>
+          <View style={styles.topCenter}>
+            <Text style={styles.topTitle}>Stories</Text>
+            <Thread width={76} />
+          </View>
+          <Pressable onPress={() => setSettingsOpen(true)} style={styles.circleBtn} accessibilityRole="button" accessibilityLabel="Event settings">
+            <Icon name="more" size={20} color={C.navy} />
+          </Pressable>
+        </View>
+      </SafeAreaView>
 
-      <ScrollView contentContainerStyle={{ padding: S.pad, paddingBottom: 96 + insets.bottom }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: S.pad, paddingTop: 6, paddingBottom: 96 + insets.bottom }} keyboardShouldPersistTaps="handled">
         {mode === 'event' ? (
           <>
             <Pressable onPress={() => runAction(changeCover)} accessibilityLabel="Change cover photo" style={styles.coverWrap}>
-              {ev.cover_path ? <Image source={{ uri: eventUrl(ev.cover_path) }} style={{ width: '100%', height: 210 }} contentFit="cover" />
-                : <View style={{ height: 130, backgroundColor: C.greenSoft, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: F.sansMedium, color: C.green }}>＋ Add a cover photo</Text></View>}
+              {ev.cover_path ? <Image source={{ uri: eventUrl(ev.cover_path) }} style={{ width: '100%', height: 184 }} contentFit="cover" />
+                : <View style={{ height: 136, backgroundColor: C.greenSoft, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: F.sansMedium, color: C.green }}>＋ Add a cover photo</Text></View>}
               <View style={styles.editCoverBadge}><Icon name="camera" size={14} color="#FFF" /><Text style={styles.editCoverText}>Edit cover</Text></View>
             </Pressable>
 
             <H1 style={{ marginBottom: 4 }}>{ev.name}</H1>
-            <Small style={{ marginBottom: 10 }}>
-              {[dateRange(ev.starts_on, ev.ends_on), ev.place].filter(Boolean).join(' · ')}{ev.is_open && !expired ? '' : ' · Wall closed'}
-            </Small>
+            <View style={styles.datePlaceRow}>
+              {ev.starts_on ? (
+                <View style={styles.datePlaceItem}>
+                  <Icon name="calendar" size={14} color={C.grey} />
+                  <Small>{dateRange(ev.starts_on, ev.ends_on)}</Small>
+                </View>
+              ) : null}
+              {ev.place ? (
+                <View style={styles.datePlaceItem}>
+                  <Icon name="pin" size={14} color={C.grey} />
+                  <Small>{ev.place}</Small>
+                </View>
+              ) : null}
+              {!ev.is_open || expired ? <Small>· Wall closed</Small> : null}
+            </View>
 
             <View style={styles.badgeRow}>
-              <View style={[styles.badge, { backgroundColor: '#FCEBE8' }]}><Text style={[styles.badgeText, { color: '#D2382B' }]}>{ev.kind}</Text></View>
-              <View style={[styles.badge, { backgroundColor: C.greenSoft }]}><Text style={[styles.badgeText, { color: C.green }]}>{ev.is_open ? 'Open wall' : 'Wall closed'}</Text></View>
+              <View style={[styles.badge, { backgroundColor: '#FCEBE8' }]}>
+                <Icon name="people" size={13} color="#D2382B" />
+                <Text style={[styles.badgeText, { color: '#D2382B' }]}>{ev.kind}</Text>
+              </View>
+              <View style={[styles.badge, { backgroundColor: C.greenSoft }]}>
+                <Icon name="lock" size={13} color={C.green} />
+                <Text style={[styles.badgeText, { color: C.green }]}>{ev.is_open && !expired ? 'Invite-only' : 'Wall closed'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.collabRow}>
+              <View style={styles.avatarStack}>
+                {contributors.slice(0, 4).map((person, idx) => (
+                  <View key={`${person}-${idx}`} style={[styles.collabAvatar, idx > 0 && { marginLeft: -8 }]}>
+                    <Text style={styles.collabInitial}>{person[0]?.toUpperCase() || 'G'}</Text>
+                  </View>
+                ))}
+                {contributors.length > 4 ? (
+                  <View style={[styles.collabAvatar, styles.collabMore, { marginLeft: -8 }]}>
+                    <Text style={styles.collabMoreText}>+{contributors.length - 4}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Small style={{ flex: 1 }} numberOfLines={2}>
+                {contributors.length === 1 ? '1 person in this event' : `${contributors.length} people in this event`}
+              </Small>
               <Pressable onPress={() => Share.share({ message: `Add your photos and stories from ${ev.name}: ${link}` })} style={styles.invitePill}>
                 <Icon name="people" size={14} color={C.navy} />
                 <Text style={styles.invitePillText}>Invite people</Text>
               </Pressable>
+              <Pressable onPress={() => Share.share({ message: `Add your photos and stories from ${ev.name}: ${link}` })} style={styles.sharePill}>
+                <Icon name="forward" size={14} color="#FFF" />
+                <Text style={styles.sharePillText}>Share</Text>
+              </Pressable>
             </View>
 
-            <View style={styles.shortcutRow}>
-              {[
-                { key: 'timeline', icon: 'calendar' as const, title: 'Timeline', sub: 'By moment', onPress: () => { setTimelineComments(false); setMode('timeline'); } },
-                { key: 'map', icon: 'pin' as const, title: 'Map view', sub: 'All locations', onPress: () => router.navigate('/map') },
-                { key: 'stories', icon: 'people' as const, title: 'Stories', sub: `${storyPosts.length} shared`, onPress: () => setWallView('stories') },
-                { key: 'schedule', icon: 'book' as const, title: 'Calendar', sub: 'Schedule', onPress: () => router.push(`/event/schedule/${ev.id}`) },
-              ].map(card => (
-                <Pressable key={card.key} onPress={card.onPress} style={styles.shortcutCard}>
-                  <View style={styles.shortcutIcon}><Icon name={card.icon} size={20} color={C.green} /></View>
-                  <Text style={styles.shortcutTitle} numberOfLines={1}>{card.title}</Text>
-                  <Text style={styles.shortcutSub} numberOfLines={1}>{card.sub}</Text>
-                </Pressable>
-              ))}
-            </View>
+            <Card style={{ padding: 14, marginBottom: 16 }}>
+              <Pressable onPress={() => { setTimelineComments(false); setMode('timeline'); }} style={styles.exploreHeader}>
+                <Text style={styles.exploreTitle}>Explore this event</Text>
+                <Icon name="forward" size={16} color={C.navy} />
+              </Pressable>
+              <View style={styles.shortcutRow}>
+                {[
+                  { key: 'people', icon: 'people' as const, title: 'People', sub: `${contributors.length} attending`, onPress: () => setWallView('stories') },
+                  { key: 'map', icon: 'pin' as const, title: 'Map', sub: ev.place?.trim() || 'All locations', onPress: () => router.navigate({ pathname: '/map', params: { ...(ev.place?.trim() ? { place: ev.place.trim() } : {}), eventTitle: ev.name, at: String(Date.now()) } }) },
+                  { key: 'schedule', icon: 'calendar' as const, title: 'Schedule', sub: `${moments.length} ${moments.length === 1 ? 'item' : 'items'}`, onPress: () => router.push(`/event/schedule/${ev.id}`) },
+                ].map(card => (
+                  <Pressable key={card.key} onPress={card.onPress} style={styles.shortcutCard}>
+                    <View style={styles.shortcutIcon}><Icon name={card.icon} size={18} color={C.green} /></View>
+                    <Text style={styles.shortcutTitle} numberOfLines={1}>{card.title}</Text>
+                    <Text style={styles.shortcutSub} numberOfLines={1}>{card.sub}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </Card>
 
             <Card style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-              <QRCode value={link} size={90} color={C.navy} backgroundColor={C.card} />
+              <QRCode value={link} size={86} color={C.navy} backgroundColor={C.card} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontFamily: F.serif, fontSize: 18, color: C.navy }}>Share this event</Text>
                 <Small>Scan the QR code to view, add photos and stories. No app needed.</Small>
@@ -225,7 +298,7 @@ export default function EventScreen() {
                 <Text style={[styles.switchTabText, wallView === 'photos' && styles.switchTabTextOn]}>Photos · {allPhotos.length}</Text>
               </Pressable>
               <Pressable onPress={() => setWallView('stories')} style={[styles.switchTab, wallView === 'stories' && styles.switchTabOn]}>
-                <Text style={[styles.switchTabText, wallView === 'stories' && styles.switchTabTextOn]}>Stories · {storyPosts.length}</Text>
+                <Text style={[styles.switchTabText, wallView === 'stories' && styles.switchTabTextOn]}>Stories{storyPosts.length ? ` · ${storyPosts.length}` : ''}</Text>
               </Pressable>
             </View>
 
@@ -238,6 +311,15 @@ export default function EventScreen() {
             ) : (
               storyPosts.length ? storyPosts.map(renderPostCard) : <Empty title="No guest stories yet" body="Tap Tell a Story below to record a voice story or write a message." />
             )}
+
+            <Pressable onPress={() => { setMode('tell'); setTellMode('menu'); }} style={styles.storyPromptCard} accessibilityRole="button">
+              <View style={styles.storyPromptMic}><Icon name="mic" size={20} color={C.green} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.storyPromptTitle}>Every photo has a story.</Text>
+                <Small>What made this gathering memorable? Add your voice or write a few words.</Small>
+              </View>
+              <Icon name="forward" size={16} color={C.grey} />
+            </Pressable>
           </>
         ) : null}
 
@@ -479,24 +561,43 @@ export default function EventScreen() {
 }
 
 const styles = StyleSheet.create({
-  coverWrap: { marginHorizontal: -S.pad, marginTop: -S.pad, marginBottom: 12 },
-  editCoverBadge: { position: 'absolute', right: 12, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(15,27,51,0.72)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: S.pad, paddingVertical: 8 },
+  circleBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
+  topCenter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  topTitle: { fontFamily: F.serif, fontSize: 22, color: C.navy },
+  coverWrap: { borderRadius: 16, overflow: 'hidden', marginBottom: 16 },
+  editCoverBadge: { position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(15,27,51,0.72)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
   editCoverText: { fontFamily: F.sansMedium, fontSize: 12, color: '#FFF' },
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 14 },
-  badge: { borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
+  datePlaceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginBottom: 12 },
+  datePlaceItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 16 },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
   badgeText: { fontFamily: F.sansMedium, fontSize: 12 },
-  invitePill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, paddingHorizontal: 12, paddingVertical: 6 },
-  invitePillText: { fontFamily: F.sansMedium, fontSize: 12.5, color: C.navy },
-  shortcutRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  shortcutCard: { flex: 1, backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.line, padding: 10, alignItems: 'center' },
-  shortcutIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.greenSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 5 },
-  shortcutTitle: { fontFamily: F.sansBold, fontSize: 11.5, color: C.navy },
-  shortcutSub: { fontFamily: F.sans, fontSize: 10, color: C.grey, marginTop: 1 },
+  collabRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 10, columnGap: 8, marginBottom: 18 },
+  avatarStack: { flexDirection: 'row', alignItems: 'center' },
+  collabAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: C.greenSoft, borderWidth: 1.5, borderColor: C.cream, alignItems: 'center', justifyContent: 'center' },
+  collabInitial: { fontFamily: F.serif, fontSize: 12, color: C.green },
+  collabMore: { backgroundColor: '#E5EAE6' },
+  collabMoreText: { fontFamily: F.sansBold, fontSize: 10.5, color: C.navy },
+  invitePill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, paddingHorizontal: 10, paddingVertical: 6 },
+  invitePillText: { fontFamily: F.sansMedium, fontSize: 12, color: C.navy },
+  sharePill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 16, backgroundColor: C.green, paddingHorizontal: 11, paddingVertical: 6 },
+  sharePillText: { fontFamily: F.sansMedium, fontSize: 12, color: '#FFF' },
+  exploreHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  exploreTitle: { fontFamily: F.serif, fontSize: 17.5, color: C.navy },
+  shortcutRow: { flexDirection: 'row', gap: 8 },
+  shortcutCard: { flex: 1, alignItems: 'center', backgroundColor: '#F4F6F1', borderRadius: 12, paddingVertical: 11, paddingHorizontal: 6 },
+  shortcutIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.greenSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  shortcutTitle: { fontFamily: F.sansBold, fontSize: 12, color: C.navy, textAlign: 'center' },
+  shortcutSub: { fontFamily: F.sans, fontSize: 10.5, color: C.grey, marginTop: 2, textAlign: 'center' },
+  storyPromptCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#EAEFE7', borderRadius: 16, padding: 14, marginTop: 18 },
+  storyPromptMic: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.greenSoft, alignItems: 'center', justifyContent: 'center' },
+  storyPromptTitle: { fontFamily: F.serif, fontSize: 16, color: C.navy, marginBottom: 2 },
   qrBtnOutline: { borderRadius: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.cream, paddingHorizontal: 12, paddingVertical: 7 },
   qrBtnOutlineText: { fontFamily: F.sansMedium, fontSize: 12.5, color: C.navy },
   qrBtnGreen: { borderRadius: 16, backgroundColor: C.green, paddingHorizontal: 12, paddingVertical: 7 },
   qrBtnGreenText: { fontFamily: F.sansMedium, fontSize: 12.5, color: '#FFF' },
-  switchTabs: { flexDirection: 'row', borderBottomWidth: 1, borderColor: C.line, marginTop: 10, marginBottom: 12 },
+  switchTabs: { flexDirection: 'row', borderBottomWidth: 1, borderColor: C.line, marginTop: 14, marginBottom: 16 },
   switchTab: { flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 2, borderColor: 'transparent' },
   switchTabOn: { borderColor: C.green },
   switchTabText: { fontFamily: F.sansMedium, fontSize: 13.5, color: C.grey },

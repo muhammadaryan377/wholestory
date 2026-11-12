@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Alert } from '@/lib/alert';
 import { useFocusEffect } from 'expo-router';
 import { LoadError, Screen, H1, H2, P, ToggleRow, Loading, Small, Field, Btn, runAction } from '@/components/ui';
+import { DatePickerField } from '@/components/date-picker';
 import { addSkipDate, deleteSkipDate, listPeople, listSkipDates, listStories, me, setPersonHidden, updateStory, type Person, type SkipDate, type Story } from '@/lib/api';
 import { C, F } from '@/lib/theme';
 import { validMonthDay } from '@/lib/dates';
@@ -38,8 +39,8 @@ export default function HardMemories() {
           <Pressable accessibilityRole="button" accessibilityLabel={'Remove ' + x.day + ' ' + MONTHS[x.month - 1]} onPress={() => runAction(async () => { await deleteSkipDate(x.id); await load(); })} hitSlop={8}><Text style={{ color: C.red }}>Remove</Text></Pressable>
         </View>
       ))}
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <View style={{ flex: 0.5 }}><Field placeholder="dd/mm" value={d} onChangeText={setD} keyboardType="numbers-and-punctuation" /></View>
+      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+        <DatePickerField placeholder="Pick date" value={d} onChange={setD} includeYear={false} style={{ flex: 0.75, marginBottom: 0 }} />
         <View style={{ flex: 1 }}><Field placeholder="Note (optional)" value={label} onChangeText={setLabel} /></View>
       </View>
       <Btn title="Skip this date" kind="outline" onPress={addDate} />

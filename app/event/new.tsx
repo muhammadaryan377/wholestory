@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Alert } from '@/lib/alert';
 import { Screen, H1, P, Field, Btn, Small } from '@/components/ui';
+import { DatePickerField, formatPickedDate } from '@/components/date-picker';
 import { Icon } from '@/components/icon';
 import { createEvent } from '@/lib/api';
 import { dateInput } from '@/lib/dates';
@@ -135,11 +136,33 @@ export default function NewEvent() {
           </Pressable>
           <Field label="Event name" value={name} onChangeText={setName} placeholder="e.g. Maya & Tom’s Wedding" />
           <Field label="Location" value={place} onChangeText={setPlace} placeholder="e.g. Lake Como, Italy" />
-          <Field label="Start date" value={start} onChangeText={setStart} placeholder="dd/mm/yyyy" keyboardType="numbers-and-punctuation" />
-          {multiDay ? <Field label="End date" value={end} onChangeText={setEnd} placeholder="dd/mm/yyyy" keyboardType="numbers-and-punctuation" /> : null}
           <View style={styles.multiRow}>
             <Text style={styles.multiLabel}>Multi-day event</Text>
-            <Switch value={multiDay} onValueChange={setMultiDay} trackColor={{ true: C.green }} />
+            <Switch value={multiDay} onValueChange={v => { setMultiDay(v); if (!v) setEnd(''); }} trackColor={{ true: C.green }} />
+          </View>
+          <View style={{ flexDirection: multiDay ? 'row' : 'column', gap: multiDay ? 10 : 0, marginTop: 12 }}>
+            <DatePickerField
+              label="Start date"
+              value={start}
+              onChange={next => {
+                setStart(next);
+                const nextIso = next ? iso(next) : null;
+                const endIso = end ? iso(end) : null;
+                if (nextIso && endIso && endIso < nextIso) setEnd('');
+              }}
+              placeholder="Choose start date"
+              style={multiDay ? { flex: 1, marginBottom: 0 } : { marginBottom: 0 }}
+            />
+            {multiDay ? (
+              <DatePickerField
+                label="End date"
+                value={end}
+                onChange={setEnd}
+                placeholder="Choose end date"
+                minDateValue={start}
+                style={{ flex: 1, marginBottom: 0 }}
+              />
+            ) : null}
           </View>
           <Btn title="Next  ›" onPress={nextFromDetails} style={{ marginTop: 14 }} />
           <Btn title="Back" kind="link" onPress={() => setStep(0)} />
@@ -164,7 +187,7 @@ export default function NewEvent() {
             </Pressable>
           </View>
 
-          <Text style={styles.dayHeading}>Day 1{start ? ` · ${start}` : ''}</Text>
+          <Text style={styles.dayHeading}>Day 1{start ? ` · ${formatPickedDate(start) || start}` : ''}</Text>
           {moments.map((m, i) => (
             <View key={`${m.name}-${i}`} style={styles.momentRow}>
               <View style={[styles.dot, { backgroundColor: DOT_COLORS[i % DOT_COLORS.length] }]} />

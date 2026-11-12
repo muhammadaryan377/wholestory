@@ -5,9 +5,9 @@ import 'leaflet/dist/leaflet.css';
 import { viewUrl } from '@/lib/media';
 import { C, F } from '@/lib/theme';
 import type { MapCluster } from '@/lib/story-display';
-import type { StoryMapHandle, StoryMapProps } from './story-map-view';
+import type { EventMapPin, StoryMapHandle, StoryMapProps } from './story-map-view';
 
-export type { StoryMapHandle, StoryMapProps };
+export type { EventMapPin, StoryMapHandle, StoryMapProps };
 export const STORY_MAP_AVAILABLE = true;
 
 const PIN_WIDTH = 116, PIN_HEIGHT = 96;
@@ -36,7 +36,7 @@ function pinElement(cluster: MapCluster, selected: boolean, photo: string | unde
   return root;
 }
 
-export const StoryMapView = forwardRef<StoryMapHandle, StoryMapProps>(function StoryMapView({ region, clusters, selectedIds, onZoomChange, onPick, onBackgroundPress }, ref) {
+export const StoryMapView = forwardRef<StoryMapHandle, StoryMapProps>(function StoryMapView({ region, clusters, selectedIds, eventPin, onZoomChange, onPick, onBackgroundPress }, ref) {
   const node = useRef<any>(null);
   const map = useRef<L.Map | null>(null);
   const pins = useRef<L.LayerGroup | null>(null);
@@ -83,11 +83,19 @@ export const StoryMapView = forwardRef<StoryMapHandle, StoryMapProps>(function S
       const icon = L.divIcon({ html: pinElement(cluster, selected, cluster.cover ? urls[cluster.cover] : undefined), className: '', iconSize: [PIN_WIDTH, PIN_HEIGHT], iconAnchor: [PIN_WIDTH / 2, PIN_HEIGHT * 0.42] });
       L.marker([cluster.lat, cluster.lng], { icon, title: cluster.label }).on('click', () => handlers.current.onPick(cluster)).addTo(layer);
     }
-  }, [clusters, selectedIds, urls]);
+    if (eventPin) {
+      L.circleMarker([eventPin.lat, eventPin.lng], { radius: 9, color: '#fff', weight: 3, fillColor: C.green, fillOpacity: 1 })
+        .bindTooltip(eventPin.label).addTo(layer);
+    }
+  }, [clusters, selectedIds, urls, eventPin]);
 
   useImperativeHandle(ref, () => ({
     zoom: factor => { if (factor < 1) map.current?.zoomIn(); else map.current?.zoomOut(); },
     focus: (lat, lng, factor = 1) => { const m = map.current; if (m) m.flyTo([lat, lng], factor < 1 ? m.getZoom() + 1.5 : m.getZoom(), { duration: 0.35 }); },
+    focusRegion: (lat, lng, latDelta = 0.14) => {
+      const m = map.current;
+      if (m) m.flyTo([lat, lng], latDelta > 1 ? 4 : 11, { duration: 0.4 });
+    },
     locate: (lat, lng) => {
       const m = map.current;
       if (!m) return;
