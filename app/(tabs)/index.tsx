@@ -12,7 +12,7 @@ import { getGrowthSeen, listStoriesWithPreferences, markGrowthSeen, type StoryWi
 import { memoryFilter, myName, type Story } from '@/lib/api';
 import { readLocalProfilePhoto, chooseLocalProfilePhoto } from '@/lib/profile-photo';
 import { Alert } from '@/lib/alert';
-import { findSuggestions, libraryAllowed, toPicked, type Suggestion } from '@/lib/suggest';
+import { dismiss, findSuggestions, libraryAllowed, setSuggestionOverride, toPicked, type Suggestion } from '@/lib/suggest';
 import { getPrefs, scheduleLocal } from '@/lib/notify';
 import { handOff } from '@/lib/handoff';
 import { findStoryGrowth, memoryDate, plural } from '@/lib/story-display';
@@ -92,7 +92,51 @@ export default function Today() {
 
   const tell = async (s: Suggestion) => {
     handOff({ photos: await toPicked(s.assets), title: s.title, prompt: 'What do you remember most about this?' });
-    router.push('/story/new');
+    await dismiss(s.id).catch(() => {});
+    setSuggestions(prev => prev.filter(item => item.id !== s.id));
+    router.push({ pathname: '/story/new', params: { private: '1' } });
+  };
+
+  const openSuggestionMenu = (s: Suggestion) => {
+    Alert.alert(s.title, `${s.assets.length} photos`, [
+      { text: 'Tell this story', onPress: () => runAction(() => tell(s)) },
+      {
+        text: 'Change cover photo',
+        onPress: async () => {
+          if (s.assets.length <= 1) return;
+          const currentIdx = s.assets.findIndex(a => a.id === s.coverAssetId);
+          const nextIdx = (currentIdx + 1) % s.assets.length;
+          const nextAsset = s.assets[nextIdx];
+          await setSuggestionOverride(s.id, { coverAssetId: nextAsset.id });
+          setSuggestions(prev => prev.map(item => item.id === s.id ? { ...item, coverAssetId: nextAsset.id, assets: [nextAsset, ...item.assets.filter(a => a.id !== nextAsset.id)] } : item));
+        },
+      },
+      {
+        text: 'Rename moment',
+        onPress: () => {
+          Alert.prompt(
+            'Rename moment',
+            'Enter a name for this moment',
+            async (newName) => {
+              if (!newName?.trim()) return;
+              await setSuggestionOverride(s.id, { title: newName.trim() });
+              setSuggestions(prev => prev.map(item => item.id === s.id ? { ...item, title: newName.trim() } : item));
+            },
+            'plain-text',
+            s.title,
+          );
+        },
+      },
+      {
+        text: 'Dismiss',
+        style: 'destructive',
+        onPress: async () => {
+          await dismiss(s.id);
+          setSuggestions(prev => prev.filter(item => item.id !== s.id));
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const pickAvatar = async () => {
@@ -202,13 +246,28 @@ export default function Today() {
         </Pressable>
 
         {allowed && suggestions.length ? <>
-          <SectionHeading title="Moments waiting to be told" onPress={() => router.push('/suggestions')} />
+          <SectionHeading title="Moments worth a story" onPress={() => router.push('/suggestions')} />
+          <Text style={styles.sectionSubtitle}>A few moments from your photos. Add the story behind them.</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontal} contentContainerStyle={styles.row}>
-            {suggestions.slice(0, 5).map(s => <Pressable key={s.id} onPress={() => runAction(() => tell(s))} style={{ width: cardWidth }}>
-              <Image source={{ uri: s.assets[0].uri }} style={{ width: cardWidth, height: Math.round(cardWidth * 0.78), borderRadius: 13 }} contentFit="cover" />
-              <Text style={styles.cardTitle} numberOfLines={2}>{s.title}</Text>
-              <Small>{s.sub}</Small>
-            </Pressable>)}
+            {suggestions.slice(0, 3).map(s => (
+              <Pressable key={s.id} onPress={() => runAction(() => tell(s))} style={{ width: cardWidth }}>
+                <View>
+                  <Image source={{ uri: s.assets[0].uri }} style={{ width: cardWidth, height: Math.round(cardWidth * 0.78), borderRadius: 13 }} contentFit="cover" />
+                  <Pressable
+                    hitSlop={8}
+                    onPress={(e: any) => { e.stopPropagation?.(); openSuggestionMenu(s); }}
+                    accessibilityLabel={`Options for ${s.title}`}
+                    style={styles.suggestionMenuBtn}>
+                    <Icon name="more" size={15} color="#FFF" />
+                  </Pressable>
+                </View>
+                <Text style={styles.cardTitle} numberOfLines={2}>{s.title}</Text>
+                <Small>{s.sub}</Small>
+                <View style={styles.tellStoryTag}>
+                  <Text style={styles.tellStoryTagText}>Tell story</Text>
+                </View>
+              </Pressable>
+            ))}
           </ScrollView>
         </> : null}
         {allowed === false ? <Pressable style={styles.softCard} onPress={() => router.push('/suggestions')}>
@@ -246,6 +305,26 @@ const styles = StyleSheet.create({
   seeAll: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   seeAllText: { color: C.green, fontFamily: F.sansMedium, fontSize: 13 },
   seeNew: { color: C.green, fontFamily: F.sansMedium, fontSize: 12 },
+  sectionSubtitle: { fontFamily: F.sans, fontSize: 13, color: C.ink, marginTop: -4, marginBottom: 10 },
+  suggestionMenuBtn: {
+    position: 'absolute', top: 6, right: 6,
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tellStoryTag: {
+    backgroundColor: C.greenSoft,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 7,
+    alignSelf: 'flex-start',
+    marginTop: 5,
+  },
+  tellStoryTagText: {
+    fontFamily: F.sansMedium,
+    fontSize: 10.5,
+    color: C.green,
+  },
   horizontal: { marginHorizontal: -S.pad },
   row: { paddingHorizontal: S.pad, gap: CARD_GAP },
   cardTitle: { color: C.navy, fontFamily: F.serif, fontSize: 15, marginTop: 5 },

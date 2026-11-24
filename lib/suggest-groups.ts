@@ -8,7 +8,7 @@ export type SuggestionAssetLike = {
 };
 
 const GAP_MS = 30 * 3600 * 1000;
-const MAX_SPAN_MS = 14 * 864e5;
+const MAX_SPAN_MS = 5 * 864e5; // Maximum 5 days per moment to avoid lumping multi-week spans together
 const MIN_GROUP_SIZE = 5;
 
 /** Excludes device screenshots, tiny thumbnails, and screen-grab assets from story suggestions. */
@@ -32,6 +32,43 @@ export function clusterSuggestionAssets<T extends SuggestionAssetLike>(assets: T
     else groups.push([asset]);
   }
   return groups.filter(group => group.length >= MIN_GROUP_SIZE);
+}
+
+/** Ranks a photo based on composition, resolution, and position within the cluster. */
+export function rankCoverPhoto<T extends SuggestionAssetLike>(asset: T, index: number, total: number): number {
+  let score = 100;
+  // Representativeness: prefer photos near the middle of the cluster (35%)
+  const centerDist = Math.abs(index - (total - 1) / 2) / Math.max(1, (total - 1) / 2);
+  score += Math.round((1 - centerDist) * 35);
+
+  if (asset.width && asset.height) {
+    // Thumbnail suitability and standard camera aspect ratio (15%)
+    const ratio = asset.width / asset.height;
+    if (ratio >= 0.7 && ratio <= 1.55) score += 15;
+    else if (ratio >= 0.55 && ratio <= 1.8) score += 8;
+
+    // Image quality & resolution (30%)
+    const pixels = asset.width * asset.height;
+    if (pixels >= 6_000_000) score += 30;
+    else if (pixels >= 2_000_000) score += 20;
+    else if (pixels >= 700_000) score += 10;
+  }
+  return score;
+}
+
+/** Selects the most representative, high-quality cover photo from a cluster. */
+export function selectBestCoverAsset<T extends SuggestionAssetLike>(assets: T[]): T {
+  if (!assets.length) throw new Error('Cannot select cover from empty assets');
+  let best = assets[0];
+  let bestScore = -Infinity;
+  for (let i = 0; i < assets.length; i += 1) {
+    const score = rankCoverPhoto(assets[i], i, assets.length);
+    if (score > bestScore) {
+      bestScore = score;
+      best = assets[i];
+    }
+  }
+  return best;
 }
 
 /** Formats an unambiguous date range string (e.g. "12–15 Aug 2026" or "15 Aug 2026"). */

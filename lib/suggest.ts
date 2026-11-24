@@ -3,12 +3,22 @@ import * as ML from 'expo-media-library/legacy';
 import { Platform } from 'react-native';
 import type { Picked } from './api';
 import { placeNames } from './places';
-import { clusterSuggestionAssets, formatSuggestionTitle, isMemoryPhotoAsset } from './suggest-groups';
+import { clusterSuggestionAssets, formatSuggestionTitle, isMemoryPhotoAsset, selectBestCoverAsset } from './suggest-groups';
 import { supabase } from './supabase';
 import { readNamedMoments } from './moment-groups';
 
-export type Suggestion = { id: string; title: string; sub: string; start: number; end: number; assets: ML.Asset[] };
+export type Suggestion = { id: string; title: string; sub: string; start: number; end: number; assets: ML.Asset[]; coverAssetId?: string };
 const DISMISSED = 'ws_suggest_dismissed';
+const OVERRIDES = 'ws_suggest_overrides';
+
+export type SuggestionOverride = { title?: string; coverAssetId?: string };
+export async function getSuggestionOverrides(): Promise<Record<string, SuggestionOverride>> {
+  try { return JSON.parse((await AsyncStorage.getItem(OVERRIDES)) ?? '{}'); } catch { return {}; }
+}
+export async function setSuggestionOverride(id: string, override: SuggestionOverride) {
+  const current = await getSuggestionOverrides();
+  await AsyncStorage.setItem(OVERRIDES, JSON.stringify({ ...current, [id]: { ...(current[id] ?? {}), ...override } }));
+}
 
 export async function libraryAllowed(ask = false) {
   if (Platform.OS === 'web') return false;
@@ -64,8 +74,34 @@ export async function findSuggestions(max = 12): Promise<Suggestion[]> {
   const page = await ML.getAssetsAsync({ mediaType: 'photo', sortBy: [['creationTime', false]], first: 3000, createdAfter: since });
   const assets = page.assets.filter(isMemoryPhotoAsset);
   const skip = await dismissed();
+  const overrides = await getSuggestionOverrides();
   const userId = (await supabase.auth.getSession()).data.session?.user.id;
   const saved = userId ? await readNamedMoments(userId) : [];
+
+  const existingStoryTimes: number[] = [];
+  if (userId) {
+    try {
+      const { listStories } = await import('./api');
+      const existing = await listStories();
+      for (const story of existing) {
+        if (Array.isArray((story as any).entries)) {
+          for (const entry of (story as any).entries) {
+            if (Array.isArray(entry.entry_photos)) {
+              for (const p of entry.entry_photos) {
+                if (p.taken_at) {
+                  const t = new Date(p.taken_at).getTime();
+                  if (!isNaN(t)) existingStoryTimes.push(t);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // Offline or error reading stories; proceed safely.
+    }
+  }
+
   const byId = new Map(page.assets.filter(a => a.creationTime).map(a => [a.id, a]));
   const assigned = new Set(saved.flatMap(g => g.assetIds));
   const manual: Suggestion[] = saved.map(group => {
@@ -76,6 +112,14 @@ export async function findSuggestions(max = 12): Promise<Suggestion[]> {
   }).filter((g): g is Suggestion => g !== null);
 
   const rawGroups = clusterSuggestionAssets(assets.filter(a => !assigned.has(a.id)))
+    .filter(cluster => {
+      if (!existingStoryTimes.length) return true;
+      let matched = 0;
+      for (const a of cluster) {
+        if (existingStoryTimes.some(t => Math.abs(t - a.creationTime) < 120_000)) matched += 1;
+      }
+      return matched < Math.min(3, Math.ceil(cluster.length * 0.4));
+    })
     .map(g => {
       const end = g[0].creationTime, start = g[g.length - 1].creationTime;
       return { id: `${start}-${g.length}`, start, end, assets: g };
@@ -86,14 +130,27 @@ export async function findSuggestions(max = 12): Promise<Suggestion[]> {
   const placeMap = await resolveClusterPlaces(rawGroups);
   const automatic: Suggestion[] = rawGroups.map(g => {
     const days = Math.max(1, Math.round((g.end - g.start) / 864e5) + 1);
-    const title = formatSuggestionTitle(placeMap[g.id] ?? [], g.start, g.end);
+    const resolvedTitle = formatSuggestionTitle(placeMap[g.id] ?? [], g.start, g.end);
+    const customTitle = overrides[g.id]?.title?.trim() || resolvedTitle;
+    const customCoverId = overrides[g.id]?.coverAssetId;
+
+    let orderedAssets = [...g.assets];
+    if (customCoverId) {
+      const chosen = orderedAssets.find(a => a.id === customCoverId);
+      if (chosen) orderedAssets = [chosen, ...orderedAssets.filter(a => a.id !== customCoverId)];
+    } else {
+      const best = selectBestCoverAsset(orderedAssets);
+      orderedAssets = [best, ...orderedAssets.filter(a => a.id !== best.id)];
+    }
+
     return {
       id: g.id,
-      title,
+      title: customTitle,
       sub: `${g.assets.length} photos${days >= 2 ? ` · ${days} days` : ''}`,
       start: g.start,
       end: g.end,
-      assets: g.assets,
+      assets: orderedAssets,
+      coverAssetId: orderedAssets[0]?.id,
     };
   });
 

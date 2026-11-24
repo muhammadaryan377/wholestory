@@ -19,7 +19,14 @@ export default function Suggestions() {
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
   const allow = async () => { if (await libraryAllowed(true)) load(); else Alert.alert('Photos not allowed', 'You can allow full photo access for Whole Story in your phone Settings.'); };
-  const tell = async (s: Suggestion) => { setBusy(s.id); try { handOff({ photos: await toPicked(s.assets), title: s.title, prompt: 'What do you remember most about this?' }); router.push('/story/new'); } finally { setBusy(null); } };
+  const tell = async (s: Suggestion) => {
+    setBusy(s.id);
+    try {
+      handOff({ photos: await toPicked(s.assets), title: s.title, prompt: 'What do you remember most about this?' });
+      await dismiss(s.id).catch(() => {});
+      router.push({ pathname: '/story/new', params: { private: '1' } });
+    } finally { setBusy(null); }
+  };
   const keep = async (s: Suggestion) => {
     setBusy(s.id);
     try { const photos = await toPicked(s.assets); const id = await createStory(s.title, localDate(new Date(s.start)), { ...emptyDraft(), photos }); await dismiss(s.id).catch(() => {}); router.push(`/story/${id}`); }
